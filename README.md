@@ -36,7 +36,15 @@ Most learning tools explain a topic to an average reader. Tailor Ed explains it 
 
 ## Status
 
-This repository is currently the **application scaffold only**. It contains a Next.js + Tailwind CSS starting point; ingestion, concept extraction, the graph store, path planning, and explanation generation are not implemented yet.
+The repository contains a working **dark-mode "Epistemic OS" interface prototype** (bento-grid inspired, Linear/Raycast aesthetic) driven entirely by client-side mock data:
+
+- Mocked auth flow (demo persona "Saumit" / Google button) with the hero morphing into a Knowledge Track Overview.
+- Roadmap rail with milestone states (mastered / current / next / locked) tied to live mastery signals.
+- Interactive mental model graph: draggable topological canvas, familiarity halos, relationship edge types (`prerequisite_for`, `analogous_to`, `subsystem_of`, `implements`), and shortest-path illumination when bridging.
+- Didactic scaffold drawer with the prerequisite interceptor (blocking cards + "Jump to Missing Prerequisite" / "Override & Bridge Anyway") and the Epistemic Bridge (anchor → target, structural mapping, the delta).
+- Bottom command bar with Chat / Live Question and Quick Note Ingestion modes plus a simulated Gemini Live voice capture; note ingestion wires new concept nodes into the graph with spawn animations.
+
+**Not implemented yet:** real ingestion, concept extraction, graph persistence, mastery learning, path planning as a service, and LLM-backed explanation generation. All data is seeded demo data (`src/domain/data.ts`).
 
 ## Tech stack
 
@@ -66,10 +74,12 @@ pnpm start   # serve the production build
 ## Project structure
 
 ```text
-src/app/layout.tsx     # root layout and fonts
-src/app/page.tsx       # starter page
-src/app/globals.css    # Tailwind import and theme tokens
-next.config.ts         # Turbopack + Tailwind configuration
+src/app/                 # App Router entry (thin server wrapper, Epistemic OS shell)
+src/components/epistemic/# UI: header, roadmap rail, graph canvas, scaffold drawer, command bar
+src/domain/              # domain types + seeded demo corpus (concepts, edges, tracks)
+src/lib/                 # graph algorithms (path tracing, prerequisite gates) + note extraction
+src/app/globals.css      # Tailwind v4 theme tokens and motion vocabulary
+next.config.ts           # Turbopack + Tailwind configuration
 ```
 
 ## Styling

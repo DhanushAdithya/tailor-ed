@@ -38,7 +38,7 @@ Use these terms consistently in code, UI copy, and docs:
 
 ## Current status
 
-**Scaffold only.** The repository currently contains a Next.js + Tailwind CSS starter. Ingestion, concept extraction, graph storage, mastery modeling, path planning, and explanation generation are **not implemented**. Do not document or imply that they work.
+**Interactive UI prototype with demo data.** The "Epistemic OS" interface (auth hero morph → knowledge tracks → engine split view) is implemented client-side with seeded concepts and animated graph interactions. Real ingestion, concept extraction, graph persistence, mastery learning, path planning as a service, and LLM-backed explanation generation are **not implemented**. All state lives in client components; no auth backend, database, or model calls exist. Do not document or imply that they work.
 
 ## Engineering conventions
 
