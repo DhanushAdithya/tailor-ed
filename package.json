@@ -1,6 +1,7 @@
 {
   "name": "tailor-ed",
   "version": "0.1.0",
+  "description": "An epistemic scaffolding agent that turns notes, code, and bookmarks into a personal mental model graph and teaches new topics through grounded analogies.",
   "private": true,
   "scripts": {
     "dev": "next dev",
