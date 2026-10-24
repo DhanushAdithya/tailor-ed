@@ -23,13 +23,14 @@ import {
   extractConceptsAPI,
   generateScaffoldAPI,
   runAgenticDemoAPI,
+  sendDirectAgentChat,
 } from "@/lib/api-client";
 import { AuthHero } from "./AuthHero";
 import { Header, type SessionStatus } from "./Header";
 import { InteractionBar } from "./InteractionBar";
 import { KnowledgeGraph } from "./KnowledgeGraph";
 import { RoadmapRail } from "./RoadmapRail";
-import { ScaffoldDrawer } from "./ScaffoldDrawer";
+import { ScaffoldDrawer, type AgentOutputData } from "./ScaffoldDrawer";
 import { TrackOverview } from "./TrackOverview";
 
 const SESSION_SEQUENCE: SessionStatus[] = ["Connected", "Listening", "Standby"];
@@ -56,6 +57,7 @@ export function AppShell() {
   const [situation, setSituation] = useState<string | null>(null);
   const [ingestion, setIngestion] = useState<Set<string> | null>(null);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("Connected");
+  const [agentOutput, setAgentOutput] = useState<AgentOutputData | null>(null);
 
   const byId = useMemo(() => indexNodes(nodes), [nodes]);
   const ingestCount = useRef(0);
@@ -208,141 +210,34 @@ export function AppShell() {
   /* bottom bar -------------------------------------------------------- */
 
   const chatSubmit = async (text: string) => {
-    const lower = text.toLowerCase();
+    announce(`Agent running with prompt: “${text.slice(0, 36)}”…`);
+    try {
+      const res = await sendDirectAgentChat(text);
+      if (res.success && res.output) {
+        const out = res.output;
+        const answer =
+          (typeof out.response === "string" && out.response) ||
+          (typeof out.text === "string" && out.text) ||
+          (typeof out.message === "string" && out.message) ||
+          (typeof out.answer === "string" && out.answer) ||
+          (typeof out.result === "string" && out.result) ||
+          JSON.stringify(out, null, 2);
 
-    // 1. Check for Agentic commerce discovery queries
-    if (lower.includes("laptop") || lower.includes("stands") || lower.includes("commerce") || lower.includes("merchant") || lower.includes("store")) {
-      announce("AgenticOrg commerce_sales_agent: running buyer discovery preview…");
-      const res = await runAgenticDemoAPI("commerce", { query: text });
-      if (res.success && res.result?.output) {
-        announce(`AgenticOrg commerce: ${JSON.stringify(res.result.output).slice(0, 60)}…`);
-      } else {
-        announce("AgenticOrg commerce discovery executed.");
-      }
-      return;
-    }
-
-    // 2. Check for Agentic workflow generation queries
-    if (lower.includes("workflow") || lower.includes("renewal") || lower.includes("contract intelligence")) {
-      announce("AgenticOrg workflows: generating & triggering workflow runtime…");
-      const res = await runAgenticDemoAPI("workflow", {
-        query: "vendor renewal policy",
-        description: text,
-      });
-      if (res.success && res.result) {
-        announce(`AgenticOrg workflow active: ${res.result.name ?? "Renewal Review"} (ID: ${res.result.workflowId})`);
-      } else {
-        announce("AgenticOrg workflow created and triggered.");
-      }
-      return;
-    }
-
-    // 3. Check for AP processor agent run
-    if (lower.includes("invoice") || lower.includes("ap_processor")) {
-      announce("AgenticOrg agents.run('ap_processor'): processing invoice…");
-      const res = await runAgenticDemoAPI("agent_run", { invoice_id: "INV-001" });
-      if (res.success && res.result) {
-        announce(`AgenticOrg AP processor: completed with confidence ${Math.round((res.result.confidence ?? 0.95) * 100)}%`);
-      }
-      return;
-    }
-
-    // 4. Epistemic Concept Bridging & Scaffolding
-    let conceptId = routeConceptFromQuery(text, BRIDGE_KEYWORDS);
-
-    // If not matched by keywords, search through all existing node labels
-    if (!conceptId) {
-      const match = nodes.find((n) => lower.includes(n.label.toLowerCase()) || lower.includes(n.id.toLowerCase()));
-      if (match) conceptId = match.id;
-    }
-
-    // If still not matched, dynamically synthesize a frontier concept node using AgenticOrg
-    if (!conceptId) {
-      announce(`AgenticOrg epistemic_scaffolder: synthesizing frontier concept for “${text.slice(0, 32)}”…`);
-      const targetLabel = text.replace(/^(explain|what is|how does|bridge)\s+/i, "").trim().slice(0, 30) || "Dynamic Concept";
-      const newId = `concept-agentic-${Date.now().toString(36)}`;
-      const anchorNode = nodes.find((n) => n.mastery >= 0.8) ?? nodes[0];
-
-      try {
-        const scaffoldResult = await generateScaffoldAPI({
-          targetId: newId,
-          targetLabel,
-          anchorId: anchorNode.id,
-          anchorLabel: anchorNode.label,
+        setAgentOutput({
+          prompt: text,
+          rawText: answer,
+          status: res.status ?? "completed",
+          confidence: res.confidence,
+          output: out,
         });
-
-        const newNode: ConceptNode = {
-          id: newId,
-          label: targetLabel,
-          codename: `agentic · ${targetLabel.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 16)}`,
-          tier: 7,
-          familiarity: "emerging",
-          mastery: 0.25,
-          blurb: `Live epistemic concept grounded through AgenticOrg via ${anchorNode.label}.`,
-          prereqIds: [anchorNode.id],
-          analogy: scaffoldResult.analogy,
-        };
-
-        const newEdge: GraphEdge = {
-          id: `edge-${newId}`,
-          source: anchorNode.id,
-          target: newId,
-          relation: "analogous_to",
-        };
-
-        setNodes((curr) => [...curr, newNode]);
-        setEdges((curr) => [...curr, newEdge]);
-        setPositions((curr) => ({
-          ...curr,
-          [newId]: { x: 0.65, y: 0.72 },
-        }));
-        setIngestion(new Set([newId]));
-        later(() => setIngestion(null), 2500);
-
-        selectConcept(newId);
-        announce(`AgenticOrg: grounded ${targetLabel} via ${anchorNode.label} (confidence ${Math.round(scaffoldResult.confidence * 100)}%).`);
-      } catch {
-        announce(`Synthesized concept for ${targetLabel}.`);
+        setView("engine");
+        setDrawerOpen(true);
+        announce(`Agent completed (status: ${res.status ?? "done"})`);
+      } else {
+        announce(`Agent returned: ${res.error || "No response"}`);
       }
-      return;
-    }
-
-    // Existing concept selected
-    selectConcept(conceptId);
-    const node = byId[conceptId];
-    if (!node) return;
-
-    // Trigger AgenticOrg scaffold generation if analogy is missing or requested
-    if (!node.analogy) {
-      announce(`AgenticOrg epistemic_scaffolder: generating grounded analogy for ${node.label}…`);
-      const anchor = nodes.find((n) => n.mastery >= 0.8 && n.id !== node.id) ?? nodes[0];
-      try {
-        const res = await generateScaffoldAPI({
-          targetId: node.id,
-          targetLabel: node.label,
-          anchorId: anchor.id,
-          anchorLabel: anchor.label,
-        });
-        setNodes((curr) =>
-          curr.map((item) => (item.id === node.id ? { ...item, analogy: res.analogy } : item)),
-        );
-      } catch {
-        // Fallback handled inside API
-      }
-    }
-
-    const gate = prerequisiteGate(node, byId, overrides);
-    if (node.mastery >= 1) {
-      announce(`${node.label} is already a mastered anchor — path traced.`);
-    } else if (gate.mode === "blocked") {
-      announce(
-        `Interceptor: ${node.label} needs ${gate.missing[0].label} (${pct(gate.missing[0].mastery)}) before bridging.`,
-      );
-    } else if (gate.mode === "override") {
-      announce(`Override bridge → ${node.label} · ${gate.missing.length} unmet signal(s).`);
-    } else {
-      const anchor = node.analogy ? byId[node.analogy.anchorId] : null;
-      announce(`Bridge ready: ${node.label} anchored via ${anchor?.label ?? "your corpus"}.`);
+    } catch (err) {
+      announce(`Agent error: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -484,6 +379,7 @@ export function AppShell() {
                 missing={missing}
                 tracePath={tracePath}
                 mobileOpen={drawerOpen}
+                agentOutput={agentOutput}
                 onClose={() => setDrawerOpen(false)}
                 onJumpToPrerequisite={jumpToPrerequisite}
                 onOverride={overrideBridge}

@@ -28,24 +28,40 @@ export interface AgenticDemoResults {
  * Creates an AgenticOrg client instance with a specific API key or
  * uses the configured environment variable.
  */
-export function createAgenticClient(apiKey?: string, baseUrl?: string): AgenticOrg {
-  if (apiKey) {
-    return new AgenticOrg({ apiKey, baseUrl });
+export function createAgenticClient(
+  keyOrOptions?: string | { apiKey?: string; api_key?: string; baseUrl?: string },
+  baseUrl?: string,
+): AgenticOrg {
+  if (typeof keyOrOptions === "string") {
+    return new AgenticOrg({ apiKey: keyOrOptions, baseUrl });
+  }
+  if (keyOrOptions?.apiKey || keyOrOptions?.api_key) {
+    const key = keyOrOptions.apiKey || keyOrOptions.api_key;
+    return new AgenticOrg({ apiKey: key, baseUrl: keyOrOptions.baseUrl || baseUrl });
   }
   const { client } = getAgenticOrgClient();
   if (!client) {
     throw new Error(
-      "AgenticOrg client is not configured. Please supply an apiKey or set AGENTICORG_API_KEY in .env.local",
+      "AgenticOrg client is not configured. Please supply an apiKey or set AGENTICORG_API_KEY in .env",
     );
   }
   return client;
 }
 
 /**
- * 1. Run an agent by type (e.g. Accounts Payable processor)
+ * 1. Run an agent by type or ID (e.g. Accounts Payable processor)
  */
-export async function runProcessorAgent(client: AgenticOrg, invoiceId = "INV-001") {
-  const result = await client.agents.run("ap_processor", {
+export async function runProcessorAgent(
+  client: AgenticOrg,
+  invoiceId = "INV-001",
+  agentNameOrId?: string,
+) {
+  const agent =
+    agentNameOrId ||
+    process.env.AGENTICORG_PROCESSOR_AGENT_ID ||
+    "ap_processor";
+
+  const result = await client.agents.run(agent, {
     inputs: { invoice_id: invoiceId },
   });
 
@@ -64,8 +80,14 @@ export async function runCommerceDiscovery(
   client: AgenticOrg,
   query = "Show available laptop stands under Rs 3000",
   merchantId = "merchant_demo",
+  agentNameOrId?: string,
 ) {
-  const commerce = await client.agents.run("commerce_sales_agent", {
+  const agent =
+    agentNameOrId ||
+    process.env.AGENTICORG_COMMERCE_AGENT_ID ||
+    "commerce_sales_agent";
+
+  const commerce = await client.agents.run(agent, {
     action: "buyer_discovery_preview",
     inputs: {
       merchant_id: merchantId,

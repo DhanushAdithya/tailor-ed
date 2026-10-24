@@ -10,6 +10,14 @@ import {
   RouteIcon,
 } from "./Icons";
 
+export interface AgentOutputData {
+  prompt: string;
+  rawText: string;
+  status: string;
+  confidence?: number;
+  output: Record<string, unknown>;
+}
+
 interface ScaffoldDrawerProps {
   node: ConceptNode | null;
   nodes: ConceptNode[];
@@ -18,6 +26,7 @@ interface ScaffoldDrawerProps {
   missing: ConceptNode[];
   tracePath: string[] | null;
   mobileOpen: boolean;
+  agentOutput?: AgentOutputData | null;
   onClose: () => void;
   onJumpToPrerequisite: (id: string) => void;
   onOverride: (id: string) => void;
@@ -37,6 +46,7 @@ export function ScaffoldDrawer({
   missing,
   tracePath,
   mobileOpen,
+  agentOutput,
   onClose,
   onJumpToPrerequisite,
   onOverride,
@@ -87,8 +97,49 @@ export function ScaffoldDrawer({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {!node && <EmptyState />}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+          {agentOutput && (
+            <div className="rise rounded-2xl border border-cyan-400/30 bg-gradient-to-b from-cyan-500/[0.08] to-transparent p-4">
+              <div className="flex items-center justify-between gap-2 border-b border-line/60 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-cyan-300 font-medium">
+                    Agent Run Output
+                  </span>
+                </div>
+                {agentOutput.confidence !== undefined && (
+                  <span className="font-mono text-[10px] text-cyan-300/80 rounded-full border border-cyan-400/20 px-2 py-0.5">
+                    confidence: {Math.round(agentOutput.confidence * 100)}%
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-3">
+                <p className="font-mono text-[10px] text-faint">Prompt:</p>
+                <p className="mt-0.5 text-xs text-dim italic">“{agentOutput.prompt}”</p>
+              </div>
+
+              <div className="mt-3.5">
+                <p className="font-mono text-[10px] text-faint">Response:</p>
+                <div className="mt-1.5 rounded-xl border border-line bg-panel-2/90 p-3 text-[13px] leading-relaxed text-ink whitespace-pre-wrap font-sans">
+                  {agentOutput.rawText}
+                </div>
+              </div>
+
+              {agentOutput.output && Object.keys(agentOutput.output).length > 1 && (
+                <details className="mt-3 font-mono text-[10px] text-faint">
+                  <summary className="cursor-pointer hover:text-dim transition-colors">
+                    View raw JSON output
+                  </summary>
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-line bg-canvas p-2 text-[10px] text-dim">
+                    {JSON.stringify(agentOutput.output, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          )}
+
+          {!node && !agentOutput && <EmptyState />}
 
           {node && mode === "blocked" && (
             <PrerequisiteWarning

@@ -6,12 +6,28 @@ export interface AgenticClientContext {
   baseUrl: string;
 }
 
+export interface ClientInitOptions {
+  apiKey?: string;
+  api_key?: string; // support snake_case from dashboard docs
+  baseUrl?: string;
+}
+
 let cachedClient: AgenticOrg | null = null;
 
-export function getAgenticOrgClient(): AgenticClientContext {
-  const apiKey = process.env.AGENTICORG_API_KEY?.trim() || "";
+export function getAgenticOrgClient(options: ClientInitOptions = {}): AgenticClientContext {
+  const apiKey =
+    options.apiKey?.trim() ||
+    options.api_key?.trim() ||
+    process.env.AGENTICORG_API_KEY?.trim() ||
+    process.env.API_KEY?.trim() ||
+    "";
+
   const grantexToken = process.env.AGENTICORG_GRANTEX_TOKEN?.trim() || "";
-  const baseUrl = (process.env.AGENTICORG_BASE_URL?.trim() || "https://app.agenticorg.ai").replace(/\/$/, "");
+  const baseUrl = (
+    options.baseUrl?.trim() ||
+    process.env.AGENTICORG_BASE_URL?.trim() ||
+    "https://app.agenticorg.ai"
+  ).replace(/\/$/, "");
 
   const isConfigured = Boolean(apiKey || grantexToken);
 
@@ -19,6 +35,20 @@ export function getAgenticOrgClient(): AgenticClientContext {
     return {
       client: null,
       isConfigured: false,
+      baseUrl,
+    };
+  }
+
+  // If a specific API key was provided via options, instantiate fresh client
+  if (options.apiKey || options.api_key) {
+    const client = new AgenticOrg({
+      apiKey,
+      baseUrl,
+      timeout: 45000,
+    });
+    return {
+      client,
+      isConfigured: true,
       baseUrl,
     };
   }

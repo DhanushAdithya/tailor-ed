@@ -192,8 +192,13 @@ export async function generateGroundedScaffold(params: {
   }
 
   try {
+    const agentIdOrType =
+      process.env.AGENTICORG_SCAFFOLD_AGENT_ID?.trim() ||
+      process.env.AGENTICORG_AGENT_ID?.trim() ||
+      "20a9ea93-6f7a-4296-b09b-de829814b4e3";
+
     // Run the epistemic scaffolding agent
-    const result = await client.agents.run("epistemic_scaffolder", {
+    const result = await client.agents.run(agentIdOrType, {
       inputs: {
         target_concept: params.targetLabel,
         anchor_concept: params.anchorLabel,

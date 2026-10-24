@@ -114,3 +114,27 @@ export async function runAgenticDemoAPI(
   }
 }
 
+export async function sendDirectAgentChat(message: string): Promise<{
+  success: boolean;
+  status?: string;
+  confidence?: number;
+  output?: Record<string, unknown>;
+  error?: string;
+}> {
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error("Direct chat error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+
