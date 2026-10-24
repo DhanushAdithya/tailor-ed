@@ -31,14 +31,13 @@ export function TrackOverview({
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-10 md:pt-14">
         <div className="text-center">
           <p className="font-mono text-[10px] tracking-[0.28em] text-cyan-400/80 uppercase">
-            workspace synced · graph live
+            Personal Learning Hub
           </p>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink md:text-[28px]">
-            Knowledge Tracks
+            Learning Tracks
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-dim">
-            Your synced corpus flows into one mental model graph. Resume the
-            frontier or feed it something new.
+            Master concepts faster with your personal mental map. Pick up where you left off or explore a new topic.
           </p>
         </div>
 
@@ -62,26 +61,26 @@ export function TrackOverview({
                 } ${track.ready ? "cursor-pointer" : "cursor-not-allowed opacity-55"}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[9px] tracking-wider text-faint">
-                    {track.domainCodename.toLowerCase()}
+                  <span className="font-mono text-[10px] tracking-wide text-cyan-400/70">
+                    {track.domain}
                   </span>
                   {track.status === "active" && (
                     <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 font-mono text-[9px] text-cyan-300">
-                      active
+                      Active
                     </span>
                   )}
                   {!track.ready && (
                     <span className="rounded-full bg-zinc-500/10 px-2 py-0.5 font-mono text-[9px] text-faint">
-                      seed pending
+                      Available Soon
                     </span>
                   )}
                 </div>
                 <h3 className="mt-2 text-sm font-semibold text-ink">{track.name}</h3>
-                <p className="mt-0.5 font-mono text-[10px] text-faint">{track.domain}</p>
+                <p className="mt-0.5 text-xs text-dim">Interactive study path</p>
 
                 <div className="mt-4">
                   <div className="flex items-baseline justify-between">
-                    <span className="font-mono text-[10px] text-faint">progress</span>
+                    <span className="text-[11px] text-faint">Progress</span>
                     <span
                       className={`font-mono text-sm font-semibold ${
                         isSelected ? "text-cyan-300" : "text-dim"
@@ -100,9 +99,9 @@ export function TrackOverview({
                       style={{ width: `${track.progress}%` }}
                     />
                   </div>
-                  <p className="mt-2 font-mono text-[10px] text-faint">
-                    {track.milestonesDone}/{track.milestonesTotal} milestones
-                    {track.id === "ds" && nextStep ? ` · next: ${nextStep.title}` : ""}
+                  <p className="mt-2 text-[11px] text-faint">
+                    {track.milestonesDone} of {track.milestonesTotal} topics completed
+                    {track.id === "ds" && nextStep ? ` · Next: ${nextStep.title}` : ""}
                   </p>
                 </div>
               </button>
@@ -117,7 +116,7 @@ export function TrackOverview({
             className="group flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-5 text-sm font-medium text-black transition-transform hover:scale-[1.015] sm:flex-none"
           >
             <RouteIcon className="h-4 w-4" />
-            Resume Current Track
+            Continue Learning
             <ArrowRightIcon className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5" />
           </button>
           <button
@@ -126,7 +125,7 @@ export function TrackOverview({
             className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line-strong bg-panel px-5 text-sm font-medium text-ink transition-colors hover:border-cyan-400/40 hover:bg-panel-2 sm:flex-none"
           >
             <LayersIcon className="h-4 w-4 text-cyan-300" />
-            Inspect Mental Model Graph
+            View Concept Map
           </button>
           <button
             type="button"
@@ -134,13 +133,12 @@ export function TrackOverview({
             className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line-strong bg-panel px-5 text-sm font-medium text-ink transition-colors hover:border-indigo-400/40 hover:bg-panel-2 sm:flex-none"
           >
             <NoteIcon className="h-4 w-4 text-indigo-300" />
-            Ingest New Notes
+            Add Study Notes
           </button>
         </div>
 
-        <p className="mx-auto max-w-md text-center font-mono text-[10px] leading-relaxed text-faint">
-          closest frontier: State Machine Replication · bridged from PostgreSQL
-          WAL — everything below unlocks with quorum agreement language.
+        <p className="mx-auto max-w-md text-center text-xs leading-relaxed text-faint">
+          Recommended next topic: <span className="text-dim font-medium">State Machine Replication</span> · Builds upon your foundation in logs and databases.
         </p>
       </div>
     </div>

@@ -36,15 +36,15 @@ Most learning tools explain a topic to an average reader. Tailor Ed explains it 
 
 ## Status
 
-The repository contains a working **dark-mode "Epistemic OS" interface prototype** (bento-grid inspired, Linear/Raycast aesthetic) driven entirely by client-side mock data:
+The repository contains a working **dark-mode "Epistemic OS" interface** (bento-grid inspired, Linear/Raycast aesthetic):
 
-- Mocked auth flow (demo persona "Saumit" / Google button) with the hero morphing into a Knowledge Track Overview.
+- **Authentication:** Real Google OAuth 2.0 flow (CSRF state verification, authorization code exchange, Google user profile extraction, and secure signed session cookies) with placeholder fallback mode.
 - Roadmap rail with milestone states (mastered / current / next / locked) tied to live mastery signals.
 - Interactive mental model graph: draggable topological canvas, familiarity halos, relationship edge types (`prerequisite_for`, `analogous_to`, `subsystem_of`, `implements`), and shortest-path illumination when bridging.
 - Didactic scaffold drawer with the prerequisite interceptor (blocking cards + "Jump to Missing Prerequisite" / "Override & Bridge Anyway") and the Epistemic Bridge (anchor → target, structural mapping, the delta).
 - Bottom command bar with Chat / Live Question and Quick Note Ingestion modes plus a simulated Gemini Live voice capture; note ingestion wires new concept nodes into the graph with spawn animations.
 
-**Not implemented yet:** real ingestion, concept extraction, graph persistence, mastery learning, path planning as a service, and LLM-backed explanation generation. All data is seeded demo data (`src/domain/data.ts`).
+**Not implemented yet:** real ingestion, concept extraction, graph persistence, mastery learning, path planning as a service, and LLM-backed explanation generation. Most knowledge concepts are seeded corpus data (`src/domain/data.ts`).
 
 ## Tech stack
 
@@ -62,6 +62,18 @@ pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Google OAuth Setup
+
+1. Copy `.env.example` to `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Create an OAuth 2.0 Client ID in [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+3. Add the authorized redirect URI:
+   - `http://localhost:3000` (or `http://localhost:3000/api/auth/google/callback`)
+4. Populate `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env.local`.
+5. Set `GOOGLE_REDIRECT_URI=http://localhost:3000` matching your Google Cloud Console configuration.
 
 Useful commands:
 

@@ -1,5 +1,5 @@
 "use client";
-
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Fragment, type ReactNode } from "react";
 import type { ConceptNode, GraphEdge, ScaffoldMode } from "@/domain/types";
 import { familiarityLabel, relationMeta } from "@/lib/graph";
@@ -8,9 +8,9 @@ import {
   CheckIcon,
   CloseIcon,
   ExclaimIcon,
+  NoteIcon,
   RouteIcon,
 } from "./Icons";
-
 export interface AgentOutputData {
   prompt: string;
   rawText: string;
@@ -33,6 +33,11 @@ interface ScaffoldDrawerProps {
   onOverride: (id: string) => void;
   onBridge: (id: string) => void;
   onFocusNode: (id: string) => void;
+  onSaveToNotes?: (note: {
+    title: string;
+    content: string;
+    category?: string;
+  }) => void;
 }
 
 function pct(mastery: number) {
@@ -53,13 +58,15 @@ export function ScaffoldDrawer({
   onOverride,
   onBridge,
   onFocusNode,
+  onSaveToNotes,
 }: ScaffoldDrawerProps) {
-  const byId = Object.fromEntries(nodes.map((candidate) => [candidate.id, candidate]));
-  const anchor = node?.analogy ? byId[node.analogy.anchorId] ?? null : null;
+  const [savedOutput, setSavedOutput] = useState(false);
+  const byId = Object.fromEntries(
+    nodes.map((candidate) => [candidate.id, candidate]),
+  );
+  const anchor = node?.analogy ? (byId[node.analogy.anchorId] ?? null) : null;
   const related = node
-    ? edges.filter(
-        (edge) => edge.source === node.id || edge.target === node.id,
-      )
+    ? edges.filter((edge) => edge.source === node.id || edge.target === node.id)
     : [];
 
   return (
@@ -81,11 +88,11 @@ export function ScaffoldDrawer({
       >
         <div className="flex items-center justify-between border-b border-line px-4 py-3.5">
           <div>
-            <p className="font-mono text-[10px] tracking-[0.25em] text-faint uppercase">
-              didactic scaffolding
+            <p className="font-mono text-[10px] tracking-[0.25em] text-cyan-400 uppercase font-medium">
+              Topic Guide
             </p>
-            <p className="mt-0.5 font-mono text-[10px] text-dim">
-              scaffold.live · prerequisite interceptor armed
+            <p className="mt-0.5 text-xs text-dim">
+              Interactive Lesson &amp; Concept Breakdown
             </p>
           </div>
           <button
@@ -104,20 +111,22 @@ export function ScaffoldDrawer({
               <div className="flex items-center justify-between gap-2 border-b border-line/60 pb-2.5">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-cyan-300 font-medium">
-                    Agent Run Output
+                  <span className="text-xs uppercase tracking-wider text-cyan-300 font-semibold">
+                    AI Tutor Explanation
                   </span>
                 </div>
                 {agentOutput.confidence !== undefined && (
                   <span className="font-mono text-[10px] text-cyan-300/80 rounded-full border border-cyan-400/20 px-2 py-0.5">
-                    confidence: {Math.round(agentOutput.confidence * 100)}%
+                    Match: {Math.round(agentOutput.confidence * 100)}%
                   </span>
                 )}
               </div>
 
               <div className="mt-3">
                 <p className="font-mono text-[10px] text-faint">Prompt:</p>
-                <p className="mt-0.5 text-xs text-dim italic">“{agentOutput.prompt}”</p>
+                <p className="mt-0.5 text-xs text-dim italic">
+                  “{agentOutput.prompt}”
+                </p>
               </div>
 
               <div className="mt-3.5">
@@ -127,16 +136,46 @@ export function ScaffoldDrawer({
                 </div>
               </div>
 
-              {agentOutput.output && Object.keys(agentOutput.output).length > 1 && (
-                <details className="mt-3 font-mono text-[10px] text-faint">
-                  <summary className="cursor-pointer hover:text-dim transition-colors">
-                    View raw JSON output
-                  </summary>
-                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-line bg-canvas p-2 text-[10px] text-dim">
-                    {JSON.stringify(agentOutput.output, null, 2)}
-                  </pre>
-                </details>
-              )}
+              <div className="mt-3.5 flex items-center justify-between gap-2 pt-2 border-t border-line/40">
+                {onSaveToNotes && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSaveToNotes({
+                        title: `AI Synthesis: ${agentOutput.prompt.slice(0, 42)}…`,
+                        content: `### Prompt: ${agentOutput.prompt}\n\n${agentOutput.rawText}`,
+                        category: "AI Scaffolding",
+                      });
+                      setSavedOutput(true);
+                      setTimeout(() => setSavedOutput(false), 2500);
+                    }}
+                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-all ${
+                      savedOutput
+                        ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
+                        : "border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
+                    }`}
+                  >
+                    <NoteIcon className="h-3.5 w-3.5" />
+                    <span>
+                      {savedOutput
+                        ? "✓ Archived to Notes"
+                        : "Save to Study Notes"}
+                    </span>
+                  </button>
+                )}
+
+                {agentOutput.output &&
+                  Object.keys(agentOutput.output).length > 1 && (
+                    <details className="font-mono text-[10px] text-faint ml-auto">
+                      <summary className="cursor-pointer hover:text-dim transition-colors">
+                        JSON
+                      </summary>
+                      <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-line bg-canvas p-2 text-[10px] text-dim">
+                        {JSON.stringify(agentOutput.output, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+              </div>
             </div>
           )}
 
@@ -166,18 +205,24 @@ export function ScaffoldDrawer({
             />
           )}
 
-          {node && (mode === "open" || mode === "override") && !node.analogy && (
-            <div className="rise rounded-2xl border border-line bg-panel-2 p-5">
-              <p className="font-mono text-[10px] tracking-wider text-faint uppercase">
-                concept dossier
-              </p>
-              <h3 className="mt-2 text-base font-semibold text-ink">{node.label}</h3>
-              <p className="mt-2 text-[13px] leading-relaxed text-dim">{node.blurb}</p>
-              <p className="mt-4 font-mono text-[10px] text-faint">
-                mastery signal: {pct(node.mastery)} · anchors not grounded yet
-              </p>
-            </div>
-          )}
+          {node &&
+            (mode === "open" || mode === "override") &&
+            !node.analogy && (
+              <div className="rise rounded-2xl border border-line bg-panel-2 p-5">
+                <p className="font-mono text-[10px] tracking-wider text-cyan-400 uppercase font-medium">
+                  Topic Summary
+                </p>
+                <h3 className="mt-2 text-base font-semibold text-ink">
+                  {node.label}
+                </h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-dim">
+                  {node.blurb}
+                </p>
+                <p className="mt-4 text-xs text-faint">
+                  Understanding: <span className="font-semibold text-cyan-300">{pct(node.mastery)}</span>
+                </p>
+              </div>
+            )}
         </div>
       </aside>
     </>
@@ -193,11 +238,10 @@ function EmptyState() {
         <RouteIcon className="h-6 w-6 text-faint" />
       </div>
       <p className="mt-4 text-sm font-medium text-dim">
-        Select a concept node to inspect prerequisites.
+        Select a concept on your map to view the lesson.
       </p>
-      <p className="mt-2 max-w-[16rem] font-mono text-[10px] leading-relaxed text-faint">
-        the interceptor verifies mastery signals before opening the epistemic
-        bridge.
+      <p className="mt-2 max-w-[16rem] text-xs leading-relaxed text-faint">
+        Your AI tutor connects every new topic to what you already understand.
       </p>
     </div>
   );
@@ -220,7 +264,8 @@ function PrerequisiteWarning({
     .map((candidate) => candidate.label)
     .slice(0, -1)
     .join(", ");
-  const tail = missing.length > 1 ? missing[missing.length - 1].label : missing[0].label;
+  const tail =
+    missing.length > 1 ? missing[missing.length - 1].label : missing[0].label;
   const joined = missing.length > 1 ? `${missingNames} and ${tail}` : tail;
 
   return (
@@ -230,18 +275,21 @@ function PrerequisiteWarning({
           <ExclaimIcon className="h-4.5 w-4.5" />
         </span>
         <div>
-          <p className="text-sm font-semibold text-rose-200">Prerequisite Warning</p>
-          <p className="font-mono text-[10px] text-rose-300/60">
-            interceptor · gate=blocked
+          <p className="text-sm font-semibold text-rose-200">
+            Recommended Prerequisite
+          </p>
+          <p className="text-xs text-rose-300/80">
+            Foundational topic suggested
           </p>
         </div>
       </div>
 
       <p className="mt-4 text-[13px] leading-relaxed text-dim">
-        Hold on! To grasp <span className="font-medium text-ink">{node.label}</span>{" "}
-        without confusion, you first need a solid grasp of{" "}
-        <span className="font-medium text-rose-200">{joined}</span>. We recommend
-        completing that milestone first.
+        Hold on! To grasp{" "}
+        <span className="font-medium text-ink">{node.label}</span> without
+        confusion, you first need a solid grasp of{" "}
+        <span className="font-medium text-rose-200">{joined}</span>. We
+        recommend completing that milestone first.
       </p>
 
       <div className="mt-4 space-y-1.5">
@@ -256,7 +304,9 @@ function PrerequisiteWarning({
               <span className="block truncate text-xs font-medium text-ink">
                 {prereq.label}
               </span>
-              <span className="font-mono text-[9px] text-faint">{prereq.codename}</span>
+              <span className="font-mono text-[9px] text-faint">
+                {prereq.codename}
+              </span>
             </span>
             <span className="flex shrink-0 items-center gap-2">
               <span
@@ -279,20 +329,20 @@ function PrerequisiteWarning({
           className="flex h-10 items-center justify-center gap-2 rounded-xl bg-rose-500/90 px-4 text-xs font-medium text-white transition-colors hover:bg-rose-500"
         >
           <RouteIcon className="h-4 w-4" />
-          Jump to Missing Prerequisite
+          Learn Prerequisite First
         </button>
         <button
           type="button"
           onClick={() => onOverride(node.id)}
           className="flex h-10 items-center justify-center rounded-xl border border-line-strong bg-panel-2 px-4 text-xs font-medium text-dim transition-colors hover:border-amber-400/40 hover:text-amber-200"
         >
-          Override &amp; Bridge Anyway
+          Skip &amp; Study This Topic Anyway
         </button>
       </div>
 
-      <p className="mt-3 font-mono text-[9px] leading-relaxed text-faint">
-        overrides are logged to the graph as weak mastery signals — explanations
-        will lean on general scaffolding instead of grounded anchors.
+      <p className="mt-3 text-xs leading-relaxed text-faint">
+        Tip: Reviewing prerequisites first makes complex topics significantly
+        easier to grasp.
       </p>
     </div>
   );
@@ -339,8 +389,8 @@ function EpistemicBridge({
 
       <div className="rise rounded-2xl border border-line bg-panel-2 p-5">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] tracking-wider text-cyan-300">
-            epistemic bridge
+          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">
+            Mental Model Analogy
           </p>
           <span
             className={`rounded-full px-2 py-0.5 font-mono text-[9px] ${
@@ -358,41 +408,50 @@ function EpistemicBridge({
         {/* anchor block */}
         {anchor && (
           <div className="mt-4 rounded-xl border border-emerald-400/25 bg-emerald-400/[0.05] p-3.5">
-            <p className="font-mono text-[9px] tracking-widest text-emerald-300/80 uppercase">
-              anchor · what you already know
+            <p className="text-[10px] tracking-wide text-emerald-300/90 uppercase font-medium">
+              Foundation · What you already understand
             </p>
-            <p className="mt-1.5 text-sm font-semibold text-ink">{analogy.anchorTitle}</p>
-            <p className="mt-1 font-mono text-[9px] text-faint">{analogy.anchorSource}</p>
+            <p className="mt-1.5 text-sm font-semibold text-ink">
+              {analogy.anchorTitle}
+            </p>
+            <p className="mt-1 text-xs text-faint">{analogy.anchorSource}</p>
           </div>
         )}
 
         <div className="flex items-center justify-center py-2">
           <ArrowRightIcon className="h-4 w-4 rotate-90 text-faint" />
-          <span className="ml-2 font-mono text-[9px] tracking-wider text-faint uppercase">
-            structural analogy
+          <span className="ml-2 text-[10px] tracking-wide text-faint uppercase font-medium">
+            How it connects
           </span>
         </div>
 
         {/* target block */}
         <div className="rounded-xl border border-cyan-400/25 bg-cyan-400/[0.05] p-3.5">
-          <p className="font-mono text-[9px] tracking-widest text-cyan-300/80 uppercase">
-            target · what you are learning
+          <p className="text-[10px] tracking-wide text-cyan-300/90 uppercase font-medium">
+            Target · What you are learning
           </p>
-          <p className="mt-1.5 text-sm font-semibold text-ink">{analogy.targetTitle}</p>
-          <p className="mt-1 font-mono text-[9px] text-faint">{analogy.targetSource}</p>
+          <p className="mt-1.5 text-sm font-semibold text-ink">
+            {analogy.targetTitle}
+          </p>
+          <p className="mt-1 text-xs text-faint">{analogy.targetSource}</p>
         </div>
 
-        <p className="mt-4 text-[13px] leading-relaxed text-dim">{analogy.summary}</p>
+        <p className="mt-4 text-[13px] leading-relaxed text-dim">
+          {analogy.summary}
+        </p>
       </div>
 
       {/* structural mapping */}
       <div className="rise rounded-2xl border border-line bg-panel p-4">
-        <p className="font-mono text-[10px] tracking-wider text-faint uppercase">
-          structural map
+        <p className="text-xs font-semibold uppercase tracking-wider text-faint">
+          Concept Comparison
         </p>
         <ul className="mt-3 space-y-3">
           {analogy.mapping.map((item) => (
-            <li key={item.from} className="rounded-xl border border-line bg-panel-2 p-3">
+            <li
+              key={item.from}
+              className="rounded-xl border border-line bg-panel-2 p-3"
+            >
               <div className="flex flex-wrap items-center gap-2 font-mono text-[10px]">
                 <span className="rounded-md bg-emerald-400/10 px-1.5 py-0.5 text-emerald-300">
                   {item.from}
@@ -402,7 +461,9 @@ function EpistemicBridge({
                   {item.to}
                 </span>
               </div>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-dim">{item.note}</p>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
+                {item.note}
+              </p>
             </li>
           ))}
         </ul>
@@ -410,14 +471,21 @@ function EpistemicBridge({
 
       {/* the delta */}
       <div className="rise rounded-2xl border border-amber-400/25 bg-gradient-to-b from-amber-400/[0.055] to-transparent p-4">
-        <p className="font-mono text-[10px] tracking-wider text-amber-300/90 uppercase">
-          the delta · exact differences &amp; edge cases
+        <p className="text-xs font-semibold uppercase tracking-wider text-amber-300/90">
+          Key Differences &amp; How It Diverges
         </p>
         <ul className="mt-3 space-y-2.5">
           {analogy.delta.map((item) => (
-            <li key={item.title} className="rounded-xl border border-line bg-panel-2/70 p-3">
-              <p className="text-xs font-semibold text-amber-200/95">{item.title}</p>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-dim">{item.body}</p>
+            <li
+              key={item.title}
+              className="rounded-xl border border-line bg-panel-2/70 p-3"
+            >
+              <p className="text-xs font-semibold text-amber-200/95">
+                {item.title}
+              </p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-dim">
+                {item.body}
+              </p>
             </li>
           ))}
         </ul>
@@ -430,7 +498,9 @@ function EpistemicBridge({
         </p>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {node.prereqIds.length === 0 && (
-            <span className="font-mono text-[9px] text-faint">no prereqs · root anchor</span>
+            <span className="font-mono text-[9px] text-faint">
+              no prereqs · root anchor
+            </span>
           )}
           {node.prereqIds.map((id) => {
             const prereq = byId[id];
@@ -447,7 +517,11 @@ function EpistemicBridge({
                     : "border-rose-400/25 bg-rose-400/[0.07] text-rose-300"
                 }`}
               >
-                {done ? <CheckIcon className="h-3 w-3" /> : <ExclaimIcon className="h-3 w-3" />}
+                {done ? (
+                  <CheckIcon className="h-3 w-3" />
+                ) : (
+                  <ExclaimIcon className="h-3 w-3" />
+                )}
                 {prereq.label} · {pct(prereq.mastery)}
               </button>
             );
@@ -470,7 +544,10 @@ function EpistemicBridge({
                   onClick={() => onFocusNode(otherId)}
                   className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left font-mono text-[10px] transition-colors hover:bg-panel-2"
                 >
-                  <i className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: meta.color }} />
+                  <i
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: meta.color }}
+                  />
                   <span className="text-dim">{meta.label}</span>
                   <span className="truncate text-faint">→ {other.label}</span>
                 </button>
@@ -498,13 +575,15 @@ function EpistemicBridge({
           {node.mastery >= 1 ? (
             <>
               <CheckIcon className="h-4 w-4" />
-              Scaffold complete · concept mastered
+              Completed · Concept Mastered
             </>
           ) : (
             <>
               <RouteIcon className="h-4 w-4" />
-              Bridge &amp; Update Graph
-              <span className="font-mono text-[9px] opacity-70">+25% signal</span>
+              Mark Understood &amp; Update Map
+              <span className="text-[10px] font-semibold opacity-80">
+                +25% Progress
+              </span>
             </>
           )}
         </button>
@@ -512,7 +591,8 @@ function EpistemicBridge({
 
       {mode === "open" && node.prereqIds.length > 0 && (
         <p className="pb-2 text-center font-mono text-[9px] text-faint">
-          grounded in {Object.keys(byId).length} synced artifacts · citations embedded
+          grounded in {Object.keys(byId).length} synced artifacts · citations
+          embedded
         </p>
       )}
     </div>
@@ -558,7 +638,9 @@ export function RichText({ content }: { content: string }) {
 
         // Code block
         if (trimmed.startsWith("```") && trimmed.endsWith("```")) {
-          const code = trimmed.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "");
+          const code = trimmed
+            .replace(/^```[a-z]*\n?/, "")
+            .replace(/\n?```$/, "");
           return (
             <pre
               key={pIdx}
@@ -586,14 +668,25 @@ export function RichText({ content }: { content: string }) {
         }
 
         const lines = trimmed.split("\n");
-        const isBulletList = lines.every((line) => line.trim().startsWith("- ") || line.trim().startsWith("* "));
-        const isNumberedList = lines.every((line) => /^\d+\.\s/.test(line.trim()));
+        const isBulletList = lines.every(
+          (line) =>
+            line.trim().startsWith("- ") || line.trim().startsWith("* "),
+        );
+        const isNumberedList = lines.every((line) =>
+          /^\d+\.\s/.test(line.trim()),
+        );
 
         if (isBulletList) {
           return (
-            <ul key={pIdx} className="my-2 space-y-1.5 pl-4 list-disc marker:text-cyan-400">
+            <ul
+              key={pIdx}
+              className="my-2 space-y-1.5 pl-4 list-disc marker:text-cyan-400"
+            >
               {lines.map((line, lIdx) => (
-                <li key={lIdx} className="text-[13px] leading-relaxed text-ink/90">
+                <li
+                  key={lIdx}
+                  className="text-[13px] leading-relaxed text-ink/90"
+                >
                   {parseInline(line.trim().replace(/^[-*]\s+/, ""))}
                 </li>
               ))}
@@ -603,9 +696,15 @@ export function RichText({ content }: { content: string }) {
 
         if (isNumberedList) {
           return (
-            <ol key={pIdx} className="my-2 space-y-1.5 pl-4 list-decimal marker:text-cyan-400">
+            <ol
+              key={pIdx}
+              className="my-2 space-y-1.5 pl-4 list-decimal marker:text-cyan-400"
+            >
               {lines.map((line, lIdx) => (
-                <li key={lIdx} className="text-[13px] leading-relaxed text-ink/90">
+                <li
+                  key={lIdx}
+                  className="text-[13px] leading-relaxed text-ink/90"
+                >
                   {parseInline(line.trim().replace(/^\d+\.\s+/, ""))}
                 </li>
               ))}
@@ -627,4 +726,3 @@ export function RichText({ content }: { content: string }) {
     </div>
   );
 }
-

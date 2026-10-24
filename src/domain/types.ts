@@ -81,6 +81,7 @@ export interface UserProfile {
   name: string;
   email: string;
   initials: string;
+  avatarUrl?: string;
 }
 
 export type ScaffoldMode = "empty" | "blocked" | "open" | "override";

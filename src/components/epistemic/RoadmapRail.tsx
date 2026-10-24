@@ -75,11 +75,11 @@ export function RoadmapRail({
       >
         <div className="flex items-center justify-between px-4 pt-4">
           <div>
-            <p className="font-mono text-[10px] tracking-[0.25em] text-faint uppercase">
-              roadmap
+            <p className="font-mono text-[10px] tracking-[0.25em] text-cyan-400 uppercase font-medium">
+              Study Roadmap
             </p>
-            <p className="mt-0.5 font-mono text-[10px] text-dim">
-              track.tm · {completed}/{steps.length} milestones
+            <p className="mt-0.5 text-xs text-dim">
+              {completed} of {steps.length} milestones completed
             </p>
           </div>
           <button
@@ -135,15 +135,15 @@ export function RoadmapRail({
                         {step.title}
                       </span>
                       <span
-                        className={`mt-1.5 inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 font-mono text-[9px] ${style.label}`}
+                        className={`mt-1.5 inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${style.label}`}
                       >
-                        {status.status === "mastered" && "mastered · 100%"}
-                        {status.status === "current" && `current · ${status.progress}%`}
+                        {status.status === "mastered" && "Completed · 100%"}
+                        {status.status === "current" && `In Progress · ${status.progress}%`}
                         {status.status === "next" &&
                           (status.progress > 0
-                            ? `next in line · ${status.progress}%`
-                            : "next in line")}
-                        {status.status === "locked" && "locked · prerequisites"}
+                            ? `Up Next · ${status.progress}%`
+                            : "Up Next")}
+                        {status.status === "locked" && "Locked"}
                       </span>
                     </span>
                   </button>
@@ -154,9 +154,8 @@ export function RoadmapRail({
         </div>
 
         <div className="border-t border-line px-4 py-3.5">
-          <p className="font-mono text-[10px] leading-relaxed text-faint">
-            click a milestone to focus its{" "}
-            <span className="text-dim">concept tier</span> on the graph.
+          <p className="text-xs text-faint">
+            Click any milestone above to highlight it on your concept map.
           </p>
         </div>
       </aside>

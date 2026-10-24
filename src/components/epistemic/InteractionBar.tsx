@@ -13,10 +13,10 @@ interface InteractionBarProps {
 }
 
 const NOTE_PLACEHOLDER =
-  "Drop notes to extract mental models — e.g. paste your vector-clocks reading notes…";
+  "Paste your study notes or article text here to extract concepts into your roadmap…";
 
 const CHAT_PLACEHOLDER =
-  "Ask to bridge a concept (e.g., 'Explain Raft using my DB notes')";
+  "Ask anything (e.g., 'Explain Raft consensus using simple terms' or 'Test my understanding')…";
 
 export function InteractionBar({
   mode,
@@ -49,7 +49,7 @@ export function InteractionBar({
     if (listening) return;
     setListening(true);
     window.setTimeout(() => {
-      setValue("Explain Raft using my PostgreSQL WAL notes");
+      setValue("Explain Raft using my database notes");
       setListening(false);
       onModeChange("chat");
       inputRef.current?.focus();
@@ -79,8 +79,8 @@ export function InteractionBar({
       <div className="mx-auto mb-2.5 flex max-w-2xl items-center gap-1 rounded-full border border-line bg-panel-2 p-1">
         {(
           [
-            ["chat", "Chat / Live Question"],
-            ["notes", "Quick Note Ingestion"],
+            ["chat", "Ask AI Tutor"],
+            ["notes", "Add Study Notes"],
           ] as [BarMode, string][]
         ).map(([candidate, label]) => (
           <button
@@ -90,7 +90,7 @@ export function InteractionBar({
               onModeChange(candidate);
               inputRef.current?.focus();
             }}
-            className={`h-7 flex-1 rounded-full font-mono text-[10px] tracking-wide transition-all ${
+            className={`h-7 flex-1 rounded-full text-xs font-medium tracking-wide transition-all ${
               mode === candidate
                 ? "bg-panel text-ink shadow-[0_1px_0_0_rgba(255,255,255,0.05)_inset]"
                 : "text-faint hover:text-dim"
@@ -106,7 +106,7 @@ export function InteractionBar({
         <button
           type="button"
           onClick={simulateVoice}
-          aria-label="Simulated Gemini Live voice capture"
+          aria-label="Voice input"
           className={`relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition-colors ${
             listening
               ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-300"
@@ -135,7 +135,7 @@ export function InteractionBar({
                 submit();
               }
             }}
-            placeholder={listening ? "listening — live voice capture…" : mode === "chat" ? CHAT_PLACEHOLDER : NOTE_PLACEHOLDER}
+            placeholder={listening ? "Listening…" : mode === "chat" ? CHAT_PLACEHOLDER : NOTE_PLACEHOLDER}
             className="max-h-28 min-h-11 flex-1 resize-none bg-transparent px-3.5 py-3 text-[13px] text-ink outline-none placeholder:text-faint"
           />
           <button
@@ -156,10 +156,10 @@ export function InteractionBar({
         </div>
       </div>
 
-      <p className="mx-auto mt-2 max-w-2xl font-mono text-[9px] leading-relaxed text-faint">
+      <p className="mx-auto mt-2 max-w-2xl text-center text-xs leading-relaxed text-faint">
         {mode === "chat"
-          ? "chat commands route through the AgenticOrg epistemic scaffolder & agent runtime."
-          : "submitting notes parses concepts and SOP procedures into the mental model graph."}
+          ? "Your AI tutor explains concepts by connecting them to what you already understand."
+          : "Notes are analyzed to automatically update your personal concept map."}
       </p>
     </div>
   );

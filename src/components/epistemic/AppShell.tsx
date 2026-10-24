@@ -9,7 +9,6 @@ import {
   INITIAL_POSITIONS,
   ROADMAP_STEPS,
   TRACKS,
-  USER_PROFILE,
 } from "@/domain/data";
 import {
   deriveStepStatus,
@@ -33,8 +32,32 @@ import { KnowledgeGraph } from "./KnowledgeGraph";
 import { RoadmapRail } from "./RoadmapRail";
 import { ScaffoldDrawer, type AgentOutputData } from "./ScaffoldDrawer";
 import { TrackOverview } from "./TrackOverview";
+import { OnboardingWizard, type OnboardingPlanData } from "./OnboardingWizard";
+import { NotesModal, type ArchivedNote } from "./NotesModal";
 
 const SESSION_SEQUENCE: SessionStatus[] = ["Connected", "Listening", "Standby"];
+
+const INITIAL_NOTES: ArchivedNote[] = [
+  {
+    id: "note-seed-1",
+    title: "System Design & Distributed Systems Roadmap",
+    createdAt: "Starter Plan",
+    category: "Technical Interview Prep",
+    targetGoal: "SDE II / III System Design",
+    timeline: "1-month",
+    dailyPace: "45 mins/day",
+    content: `### 🎯 Targeted Milestones
+- **Reliability & Distributed Fallacies**: Latency is non-zero; network partitions are guaranteed.
+- **Write-Ahead Logging (WAL)**: Append-only disk persistence before in-memory mutations.
+- **Consensus Algorithms (Raft/Paxos)**: Quorum-based leader election and replicated state machines.
+- **Consistent Hashing & Partitioning**: Virtual nodes minimizing key remap overhead.
+- **Fault-Tolerant Cache Invalidation**: Write-through vs Write-around vs Cache-aside patterns.
+
+### 📌 Knowledge Gap Analysis
+- Identified strong foundation in single-threaded event loops (Node.js/Python).
+- Need conceptual bridge from synchronous event-driven I/O to multi-leader asynchronous distributed coordination.`,
+  },
+];
 
 function pct(mastery: number) {
   return `${Math.round(mastery * 100)}%`;
@@ -59,10 +82,55 @@ export function AppShell() {
   const [ingestion, setIngestion] = useState<Set<string> | null>(null);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("Connected");
   const [agentOutput, setAgentOutput] = useState<AgentOutputData | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isPlaceholderConfig, setIsPlaceholderConfig] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [savedNotes, setSavedNotes] = useState<ArchivedNote[]>(INITIAL_NOTES);
 
   const byId = useMemo(() => indexNodes(nodes), [nodes]);
   const ingestCount = useRef(0);
   const timers = useRef<number[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (typeof window !== "undefined") {
+      const search = window.location.search;
+      if (search) {
+        const params = new URLSearchParams(search);
+        if (params.has("code") || (params.has("error") && params.has("state"))) {
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.assign(`/api/auth/google/callback${search}`);
+          return;
+        }
+      }
+    }
+
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data: { user: UserProfile | null; isPlaceholderConfig: boolean }) => {
+        if (!isMounted) return;
+        setIsPlaceholderConfig(data.isPlaceholderConfig);
+        if (data.user) {
+          setUser(data.user);
+          if (typeof window !== "undefined") {
+            const hasOnboarded = localStorage.getItem("tailored_onboarded");
+            if (!hasOnboarded) {
+              setShowOnboarding(true);
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Session check failed:", err);
+      })
+      .finally(() => {
+        if (isMounted) setIsCheckingSession(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -73,6 +141,29 @@ export function AppShell() {
     }, 5200);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("tailored_study_notes");
+        if (stored) {
+          setSavedNotes(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.error("Failed to load notes from localStorage:", err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && savedNotes.length > 0) {
+      try {
+        localStorage.setItem("tailored_study_notes", JSON.stringify(savedNotes));
+      } catch (err) {
+        console.error("Failed to save notes to localStorage:", err);
+      }
+    }
+  }, [savedNotes]);
 
   useEffect(
     () => () => {
@@ -140,7 +231,7 @@ export function AppShell() {
 
   const clearFocus = () => {
     setFocusTierIds(null);
-    announce("Tier focus cleared — full corpus graph restored.");
+    announce("Focus cleared — full concept map restored.");
   };
 
   const moveNode = (id: string, x: number, y: number) => {
@@ -160,7 +251,12 @@ export function AppShell() {
     if (track) announce(`Active track → ${track.name} · roadmap locked in.`);
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
     setUser(null);
     setView("overview");
     setSelectedId(null);
@@ -169,6 +265,381 @@ export function AppShell() {
     setIngestion(null);
     setSituation(null);
     setBarMode("chat");
+  };
+
+  const handleGoogleSignIn = () => {
+    // Navigate via browser to trigger server-side OAuth redirect flow
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`${window.location.origin}/api/auth/google`);
+  };
+
+  const handlePlaceholderSignIn = async () => {
+    try {
+      const res = await fetch("/api/auth/placeholder-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Google Account (Placeholder)",
+          email: "explorer.demo@gmail.com",
+        }),
+      });
+      const data = await res.json();
+      if (data.user) {
+        setUser(data.user);
+        announce("Signed in successfully — Welcome to TailorEd!");
+        setShowOnboarding(true);
+      }
+    } catch (err) {
+      console.error("Placeholder sign in error:", err);
+    }
+  };
+
+  const handleOnboardingComplete = (planData: OnboardingPlanData) => {
+    setShowOnboarding(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tailored_onboarded", "true");
+    }
+
+    const categoryInfo = {
+      interview: {
+        title: "Technical Interview Prep",
+        milestoneList: [
+          {
+            id: "dist_fallacies",
+            label: "Distributed Fallacies & Failure Modes",
+            codename: "DIST_FALLACIES",
+            blurb: "Network partitions, latency jitter, and asynchronous unreliability.",
+            tier: 1,
+            mastery: planData.baseline === "beginner" ? 0.35 : planData.baseline === "intermediate" ? 0.6 : 0.85,
+            familiarity: (planData.baseline === "beginner" ? "emerging" : "mastered") as "emerging" | "mastered",
+            prereqIds: ["concurrency"],
+          },
+          {
+            id: "wal_engine",
+            label: "Write-Ahead Logs & Storage Internals",
+            codename: "WAL_STORAGE",
+            blurb: "Append-only sequential disk writes protecting volatile in-memory state.",
+            tier: 2,
+            mastery: planData.baseline === "beginner" ? 0.15 : planData.baseline === "intermediate" ? 0.45 : 0.7,
+            familiarity: (planData.baseline === "advanced" ? "mastered" : "emerging") as "emerging" | "mastered",
+            prereqIds: ["dist_fallacies"],
+          },
+          {
+            id: "consensus_raft",
+            label: "Quorum Consensus & Raft Elections",
+            codename: "RAFT_CONSENSUS",
+            blurb: "Leader leases, log replication, terms, and split-brain resolution.",
+            tier: 3,
+            mastery: planData.baseline === "beginner" ? 0.05 : planData.baseline === "intermediate" ? 0.25 : 0.5,
+            familiarity: "emerging" as const,
+            prereqIds: ["wal_engine"],
+          },
+          {
+            id: "sharding_hash",
+            label: "Consistent Hashing & Ring Partitioning",
+            codename: "CONSISTENT_HASH",
+            blurb: "Virtual token distributions avoiding whole-cluster key remapping upon node failures.",
+            tier: 4,
+            mastery: 0.1,
+            familiarity: "uncharted" as const,
+            prereqIds: ["consensus_raft"],
+          },
+          {
+            id: "ha_arch",
+            label: "High-Availability Architecture & Circuit Breaking",
+            codename: "HA_SYSTEM_ARCH",
+            blurb: "Degraded fallback modes, bulkhead isolation, and rate-limiting envelopes.",
+            tier: 5,
+            mastery: 0.0,
+            familiarity: "uncharted" as const,
+            prereqIds: ["sharding_hash"],
+          },
+        ],
+      },
+      exam: {
+        title: "Competitive Exam Preparation",
+        milestoneList: [
+          {
+            id: "algo_bounds",
+            label: "Discrete Foundations & Asymptotics",
+            codename: "ALGO_BOUNDS",
+            blurb: "Recurrence relations, master theorem, and state-space complexity bounds.",
+            tier: 1,
+            mastery: planData.baseline === "beginner" ? 0.4 : planData.baseline === "intermediate" ? 0.65 : 0.85,
+            familiarity: "mastered" as const,
+            prereqIds: ["concurrency"],
+          },
+          {
+            id: "sync_primitives",
+            label: "Process Synchronization & Semaphores",
+            codename: "SYNC_PRIMITIVES",
+            blurb: "Critical sections, Dekker's algorithm, mutexes, and deadlock conditions.",
+            tier: 2,
+            mastery: planData.baseline === "beginner" ? 0.2 : 0.45,
+            familiarity: "emerging" as const,
+            prereqIds: ["algo_bounds"],
+          },
+          {
+            id: "vm_paging",
+            label: "Virtual Memory Hierarchy & Paging",
+            codename: "VM_PAGING",
+            blurb: "Page tables, TLB hits/misses, inverted tables, and working set models.",
+            tier: 3,
+            mastery: 0.15,
+            familiarity: "emerging" as const,
+            prereqIds: ["sync_primitives"],
+          },
+          {
+            id: "db_serializability",
+            label: "ACID Serializability & 2-Phase Locking",
+            codename: "DB_SERIALIZABILITY",
+            blurb: "Conflict vs view serializability, recoverable schedules, and cascading aborts.",
+            tier: 4,
+            mastery: 0.05,
+            familiarity: "uncharted" as const,
+            prereqIds: ["vm_paging"],
+          },
+          {
+            id: "mock_diagnostic",
+            label: "Diagnostic Mock Checkpoints & Synthesis",
+            codename: "MOCK_DIAGNOSTIC",
+            blurb: "Timed exam questions, error categorization, and rapid retrieval drills.",
+            tier: 5,
+            mastery: 0.0,
+            familiarity: "uncharted" as const,
+            prereqIds: ["db_serializability"],
+          },
+        ],
+      },
+      general: {
+        title: "General Tech & AI Knowledge",
+        milestoneList: [
+          {
+            id: "transformer_attn",
+            label: "Attention Mechanisms & Token Embeddings",
+            codename: "TRANSFORMER_ATTN",
+            blurb: "Scaled dot-product attention, query-key-value projections, and positional encodings.",
+            tier: 1,
+            mastery: planData.baseline === "beginner" ? 0.4 : 0.7,
+            familiarity: "mastered" as const,
+            prereqIds: ["eventloop"],
+          },
+          {
+            id: "vector_hnsw",
+            label: "Vector Indexing & HNSW Proximity Graphs",
+            codename: "VECTOR_HNSW",
+            blurb: "Hierarchical navigable small world graphs and approximate nearest neighbor search.",
+            tier: 2,
+            mastery: 0.3,
+            familiarity: "emerging" as const,
+            prereqIds: ["transformer_attn"],
+          },
+          {
+            id: "rag_grounding",
+            label: "Context Chunking & Grounded Retrieval",
+            codename: "RAG_GROUNDING",
+            blurb: "Semantic chunk boundaries, hybrid BM25 + dense re-ranking, and context hallucination bounds.",
+            tier: 3,
+            mastery: 0.2,
+            familiarity: "emerging" as const,
+            prereqIds: ["vector_hnsw"],
+          },
+          {
+            id: "agentic_routing",
+            label: "Agentic Tool Routing & ReAct Loops",
+            codename: "AGENTIC_ROUTING",
+            blurb: "Chain-of-thought, tool schema resolution, iterative execution, and fallback strategies.",
+            tier: 4,
+            mastery: 0.1,
+            familiarity: "uncharted" as const,
+            prereqIds: ["rag_grounding"],
+          },
+          {
+            id: "prod_eval_guardrails",
+            label: "Production Evaluation & Safe Guardrails",
+            codename: "PROD_EVAL_GUARDRAILS",
+            blurb: "Deterministic test suites, prompt injection mitigation, and telemetry monitors.",
+            tier: 5,
+            mastery: 0.0,
+            familiarity: "uncharted" as const,
+            prereqIds: ["agentic_routing"],
+          },
+        ],
+      },
+      other: {
+        title: "Custom Learning Track",
+        milestoneList: [
+          {
+            id: "custom_foundations",
+            label: `${planData.targetGoal} Foundations`,
+            codename: "CORE_FOUNDATIONS",
+            blurb: `Core principles, essential terminology, and key concepts in ${planData.targetGoal}.`,
+            tier: 1,
+            mastery: planData.baseline === "beginner" ? 0.35 : 0.65,
+            familiarity: (planData.baseline === "beginner" ? "emerging" : "mastered") as "emerging" | "mastered",
+            prereqIds: ["concurrency"],
+          },
+          {
+            id: "custom_arch",
+            label: "Architecture & Design Patterns",
+            codename: "CORE_PATTERNS",
+            blurb: "Key building blocks, best practices, and standard structural patterns.",
+            tier: 2,
+            mastery: 0.3,
+            familiarity: "emerging" as const,
+            prereqIds: ["custom_foundations"],
+          },
+          {
+            id: "custom_practical",
+            label: "Hands-on Practical Build",
+            codename: "PRACTICAL_BUILD",
+            blurb: "Applying concepts to build practical solutions and real-world tools.",
+            tier: 3,
+            mastery: 0.15,
+            familiarity: "emerging" as const,
+            prereqIds: ["custom_arch"],
+          },
+          {
+            id: "custom_advanced",
+            label: "Advanced Problem Solving & Edge Cases",
+            codename: "ADVANCED_EDGE_CASES",
+            blurb: "Handling complex scenarios, scalability, optimization, and debugging.",
+            tier: 4,
+            mastery: 0.05,
+            familiarity: "uncharted" as const,
+            prereqIds: ["custom_practical"],
+          },
+          {
+            id: "custom_synthesis",
+            label: "Review, Practice & Final Assessment",
+            codename: "REVIEW_SYNTHESIS",
+            blurb: "End-to-end knowledge check, diagnostic practice, and conceptual mastery.",
+            tier: 5,
+            mastery: 0.0,
+            familiarity: "uncharted" as const,
+            prereqIds: ["custom_advanced"],
+          },
+        ],
+      },
+    };
+
+    const targetCategory = categoryInfo[planData.category] || categoryInfo.interview;
+    const newMilestones: ConceptNode[] = targetCategory.milestoneList;
+
+    const newEdges: GraphEdge[] = [
+      {
+        id: `edge-${newMilestones[0].prereqIds[0]}-${newMilestones[0].id}`,
+        source: newMilestones[0].prereqIds[0],
+        target: newMilestones[0].id,
+        relation: "prerequisite_for",
+      },
+      ...newMilestones.slice(1).map((m, idx) => ({
+        id: `edge-${newMilestones[idx].id}-${m.id}`,
+        source: newMilestones[idx].id,
+        target: m.id,
+        relation: "prerequisite_for" as const,
+      })),
+    ];
+
+    const newPositions: Record<string, { x: number; y: number }> = {};
+    newMilestones.forEach((m, idx) => {
+      newPositions[m.id] = {
+        x: 0.22 + idx * 0.14,
+        y: 0.42 + (idx % 2 === 0 ? 0.08 : -0.06),
+      };
+    });
+
+    const studyPlanNote: ArchivedNote = {
+      id: `plan-${Date.now()}`,
+      title: `${targetCategory.title}: ${planData.targetGoal}`,
+      createdAt: new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      category: targetCategory.title,
+      targetGoal: planData.targetGoal,
+      timeline: planData.timeline,
+      dailyPace: planData.dailyPace,
+      content: `### 🎯 Study Roadmap: ${planData.targetGoal}
+
+**Track**: ${targetCategory.title}
+**Starting Baseline**: ${planData.baseline.toUpperCase()}
+**Timeline**: ${planData.timeline} | **Daily Study Time**: ${planData.dailyPace}
+
+---
+
+### 🗺️ Planned Milestones & Concepts
+${newMilestones
+  .map(
+    (m, idx) =>
+      `${idx + 1}. **${m.label}**\n   - *Overview*: ${m.blurb}\n   - *Starting Level*: ${Math.round(m.mastery * 100)}% (${m.familiarity})`
+  )
+  .join("\n\n")}
+
+---
+
+### 💡 How to Study This Track
+- **Step-by-Step Learning**: Follow the path on your concept map. Each topic builds directly on the previous one.
+- **Ask Your AI Tutor**: Use the bottom chat bar anytime to ask questions, get simple analogies, or test your understanding.
+- **Track Progress**: As you understand concepts, click "Mark Understood" in the guide to unlock the next milestone.
+${planData.customNotes ? `\n### 📝 Notes\n${planData.customNotes}` : ""}`,
+    };
+
+    setSavedNotes((prev) => [studyPlanNote, ...prev]);
+
+    setNodes((current) => {
+      const existingIds = new Set(current.map((n) => n.id));
+      const filtered = newMilestones.filter((n) => !existingIds.has(n.id));
+      return [...current, ...filtered];
+    });
+
+    setEdges((current) => {
+      const existingIds = new Set(current.map((e) => e.id));
+      const filtered = newEdges.filter((e) => !existingIds.has(e.id));
+      return [...current, ...filtered];
+    });
+
+    setPositions((current) => ({ ...current, ...newPositions }));
+
+    setView("engine");
+    const firstNodeId = newMilestones[0].id;
+    setSelectedId(firstNodeId);
+    setTracePath(shortestPathToTarget([...nodes, ...newMilestones], [...edges, ...newEdges], firstNodeId));
+    setDrawerOpen(true);
+
+    announce(
+      `🎯 Learning roadmap created for “${planData.targetGoal}”! Topic “${newMilestones[0].label}” ready to explore.`
+    );
+  };
+
+  const handleSaveToNotes = ({
+    title,
+    content,
+    category,
+  }: {
+    title: string;
+    content: string;
+    category?: string;
+  }) => {
+    const newNote: ArchivedNote = {
+      id: `ai-note-${Date.now()}`,
+      title,
+      createdAt: new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      category: category || "AI Scaffolding",
+      targetGoal: "Epistemic Retention",
+      timeline: "Reference",
+      dailyPace: "Review as needed",
+      content,
+    };
+    setSavedNotes((prev) => [newNote, ...prev]);
+    announce(`Saved “${title}” to Study Notes.`);
   };
 
   /* quick actions ---------------------------------------------------- */
@@ -286,20 +757,36 @@ export function AppShell() {
         };
       });
 
-      later(() => announce("Extracting concepts · grounding checks against your corpus…"), 500);
-      later(() => announce("Matching against mental model graph…"), 1100);
+      later(() => announce("Extracting key concepts from your notes…"), 500);
+      later(() => announce("Connecting topics into your concept map…"), 1100);
       later(() => {
         setNodes((current) => [...current, ...fragment.nodes]);
         setEdges((current) => [...current, ...fragment.edges]);
         setPositions((current) => ({ ...current, ...newPositions }));
         setView("engine");
         announce(
-          fragment.source === "agenticorg"
-            ? `AgenticOrg live extraction: wired ${fragment.nodes.length} grounded concept nodes into your graph.`
-            : `Wired ${fragment.nodes.length} new concept node${fragment.nodes.length === 1 ? "" : "s"} into your mental model graph.`,
+          `Added ${fragment.nodes.length} new topic${fragment.nodes.length === 1 ? "" : "s"} into your concept map.`
         );
       }, 1600);
       later(() => setIngestion(null), 3200);
+
+      // Save user raw notes into notes archive
+      const ingestedNote: ArchivedNote = {
+        id: `note-user-${Date.now()}`,
+        title: `Study Notes: ${text.slice(0, 36)}…`,
+        createdAt: new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        category: "Study Notes",
+        targetGoal: "Personal Knowledge Map",
+        timeline: "Active Tracking",
+        dailyPace: "Self-Paced",
+        content: text,
+      };
+      setSavedNotes((prev) => [ingestedNote, ...prev]);
     } catch {
       const fallback = extractFromNotes(text, slot);
       setNodes((current) => [...current, ...fallback.nodes]);
@@ -317,19 +804,28 @@ export function AppShell() {
 
   /* ------------------------------------------------------------------ */
 
+  if (isCheckingSession) {
+    return (
+      <div className="flex h-dvh flex-col bg-canvas">
+        <TitleBoard />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center gap-3">
+            <span className="h-2 w-2 rounded-full bg-cyan-400 soft-pulse" />
+            <span className="font-mono text-xs text-dim">Syncing epistemic session…</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex h-dvh flex-col bg-canvas">
         <TitleBoard />
         <AuthHero
-          onDemoSignIn={() => {
-            setUser(USER_PROFILE);
-            announce("Workspace synced — 3 sources · 1 active track.");
-          }}
-          onGoogleSignIn={() => {
-            setUser(USER_PROFILE);
-            announce("Google workspaces linked — epistemic graph bootstrapped.");
-          }}
+          isPlaceholderConfig={isPlaceholderConfig}
+          onGoogleSignIn={handleGoogleSignIn}
+          onPlaceholderSignIn={handlePlaceholderSignIn}
         />
       </div>
     );
@@ -357,6 +853,9 @@ export function AppShell() {
         onSelectTrack={selectTrack}
         onSignOut={signOut}
         onToggleRoadmap={() => setRailOpen((value) => !value)}
+        onOpenNotes={() => setShowNotesModal(true)}
+        notesCount={savedNotes.length}
+        onNewPlan={() => setShowOnboarding(true)}
       />
 
       <div className="relative flex min-h-0 flex-1">
@@ -411,6 +910,7 @@ export function AppShell() {
                 onOverride={overrideBridge}
                 onBridge={bridgeAndCommit}
                 onFocusNode={(id) => selectConcept(id)}
+                onSaveToNotes={handleSaveToNotes}
               />
             </div>
           )}
@@ -424,6 +924,19 @@ export function AppShell() {
           />
         </main>
       </div>
+
+      <OnboardingWizard
+        user={user}
+        isOpen={showOnboarding}
+        onComplete={handleOnboardingComplete}
+        onDismiss={() => setShowOnboarding(false)}
+      />
+
+      <NotesModal
+        isOpen={showNotesModal}
+        notes={savedNotes}
+        onClose={() => setShowNotesModal(false)}
+      />
     </div>
   );
 }
@@ -433,7 +946,7 @@ function TitleBoard() {
   return (
     <div className="flex items-center justify-center gap-3 border-b border-line/60 bg-panel/60 px-6 py-3.5">
       <span className="font-mono text-[10px] tracking-[0.3em] text-faint uppercase">
-        tailor-ed · epistemic scaffolding engine
+        TailorEd · Visual Mental Model Learning
       </span>
     </div>
   );

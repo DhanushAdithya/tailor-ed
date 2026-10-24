@@ -5,6 +5,7 @@ import type { UserProfile } from "@/domain/types";
 import { TRACKS } from "@/domain/data";
 import {
   ChevronDownIcon,
+  GoogleIcon,
   LayersIcon,
   LogoMark,
   NoteIcon,
@@ -20,6 +21,9 @@ interface HeaderProps {
   onSelectTrack: (trackId: string) => void;
   onSignOut: () => void;
   onToggleRoadmap: () => void;
+  onOpenNotes?: () => void;
+  notesCount?: number;
+  onNewPlan?: () => void;
 }
 
 const SESSION_STYLES: Record<SessionStatus, { dot: string; text: string }> = {
@@ -35,6 +39,9 @@ export function Header({
   onSelectTrack,
   onSignOut,
   onToggleRoadmap,
+  onOpenNotes,
+  notesCount = 0,
+  onNewPlan,
 }: HeaderProps) {
   const activeTrack = TRACKS.find((track) => track.id === activeTrackId) ?? TRACKS[0];
   const session = SESSION_STYLES[sessionStatus];
@@ -54,21 +61,46 @@ export function Header({
         <div className="flex shrink-0 items-center gap-2.5">
           <LogoMark />
           <span className="hidden text-sm font-semibold tracking-tight text-ink sm:inline">
-            Epistemic OS
+            TailorEd
           </span>
         </div>
 
         <TrackSelector activeTrackId={activeTrackId} onSelectTrack={onSelectTrack} />
-
-        <span className="hidden shrink-0 font-mono text-[10px] text-faint lg:inline">
-          {activeTrack.domainCodename.toLowerCase()} · track.frame
-        </span>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2.5 md:gap-4">
-        <div className="hidden items-center gap-1.5 rounded-full border border-line bg-panel-2 px-2.5 py-1 font-mono text-[10px] text-dim md:flex">
+      <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        {onNewPlan && (
+          <button
+            type="button"
+            onClick={onNewPlan}
+            className="flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition-colors shadow-sm"
+            title="Create a new personalized learning roadmap"
+          >
+            <RouteIcon className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Set Learning Goal</span>
+          </button>
+        )}
+
+        {onOpenNotes && (
+          <button
+            type="button"
+            onClick={onOpenNotes}
+            className="relative flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-2.5 py-1.5 text-xs font-medium text-dim hover:text-ink hover:border-line-2 transition-colors"
+            title="View saved study plans and reference notes"
+          >
+            <NoteIcon className="h-3.5 w-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Study Notes</span>
+            {notesCount > 0 && (
+              <span className="grid min-w-[16px] h-4 place-items-center rounded-full bg-cyan-400/20 border border-cyan-400/40 px-1 font-mono text-[9px] font-semibold text-cyan-300">
+                {notesCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        <div className="hidden items-center gap-1.5 rounded-full border border-line bg-panel-2 px-2.5 py-1 font-mono text-[10px] text-dim lg:flex">
           <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
-          <span>agenticorg runtime</span>
+          <span>AI Tutor Online</span>
         </div>
 
         <div className="flex items-center gap-2 rounded-full border border-line bg-panel-2 py-1.5 pr-3.5 pl-2.5">
@@ -79,10 +111,10 @@ export function Header({
             <span className={`soft-pulse h-2 w-2 rounded-full ${session.dot}`} />
           </span>
           <span className="hidden font-mono text-[10px] tracking-wider text-dim sm:inline">
-            live session
+            Status
           </span>
           <span className={`font-mono text-[10px] tracking-wider ${session.text}`}>
-            {sessionStatus}
+            {sessionStatus === "Standby" ? "Ready" : sessionStatus}
           </span>
         </div>
 
@@ -180,9 +212,19 @@ function ProfileMenu({
         type="button"
         aria-label="Open profile menu"
         onClick={() => setOpen((value) => !value)}
-        className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white ring-1 ring-white/20 transition-transform hover:scale-105"
+        className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white ring-1 ring-white/20 transition-transform hover:scale-105"
       >
-        {user.initials}
+        {user.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.avatarUrl}
+            alt={user.name}
+            referrerPolicy="no-referrer"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          user.initials
+        )}
       </button>
 
       {open && (
@@ -196,8 +238,18 @@ function ProfileMenu({
           />
           <div className="absolute top-[calc(100%+10px)] right-0 z-40 w-64 rounded-xl border border-line bg-panel p-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)]">
             <div className="flex items-center gap-3 border-b border-line px-2 pb-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white">
-                {user.initials}
+              <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white">
+                {user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  user.initials
+                )}
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-xs font-medium text-ink">
@@ -209,6 +261,11 @@ function ProfileMenu({
               </span>
             </div>
             <div className="mt-1.5 space-y-0.5 text-xs text-dim">
+              <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel-2">
+                <GoogleIcon className="h-4 w-4" />
+                <span>Auth Provider</span>
+                <span className="ml-auto font-mono text-[9px] text-cyan-300">Google OAuth</span>
+              </div>
               <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel-2">
                 <LayersIcon className="h-4 w-4 text-faint" />
                 <span>Synced sources</span>
