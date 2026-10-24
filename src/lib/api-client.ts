@@ -119,6 +119,7 @@ export async function sendDirectAgentChat(message: string): Promise<{
   status?: string;
   confidence?: number;
   output?: Record<string, unknown>;
+  raw_output?: string;
   error?: string;
 }> {
   try {

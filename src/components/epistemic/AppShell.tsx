@@ -25,6 +25,7 @@ import {
   runAgenticDemoAPI,
   sendDirectAgentChat,
 } from "@/lib/api-client";
+import { extractGraphUpdateFromInteraction } from "@/lib/graph-updater";
 import { AuthHero } from "./AuthHero";
 import { Header, type SessionStatus } from "./Header";
 import { InteractionBar } from "./InteractionBar";
@@ -216,7 +217,10 @@ export function AppShell() {
       if (res.success && res.output) {
         const out = res.output;
         const answer =
+          (typeof res.raw_output === "string" && res.raw_output) ||
+          (typeof out.raw_output === "string" && (out.raw_output as string)) ||
           (typeof out.response === "string" && out.response) ||
+          (typeof out.reply === "string" && out.reply) ||
           (typeof out.text === "string" && out.text) ||
           (typeof out.message === "string" && out.message) ||
           (typeof out.answer === "string" && out.answer) ||
@@ -232,7 +236,29 @@ export function AppShell() {
         });
         setView("engine");
         setDrawerOpen(true);
-        announce(`Agent completed (status: ${res.status ?? "done"})`);
+
+        // Dynamically update the Mental Model Graph based on the user query & AI response
+        const graphUpdate = extractGraphUpdateFromInteraction(text, answer, nodes, positions);
+
+        if (graphUpdate.newNodes.length > 0) {
+          const combinedNodes = [...graphUpdate.updatedExistingNodes, ...graphUpdate.newNodes];
+          const combinedEdges = [...edges, ...graphUpdate.newEdges];
+          setNodes(combinedNodes);
+          setEdges(combinedEdges);
+          setPositions((curr) => ({ ...curr, ...graphUpdate.newPositions }));
+          setIngestion(new Set(graphUpdate.newNodes.map((n) => n.id)));
+          later(() => setIngestion(null), 3500);
+
+          const headNewId = graphUpdate.newNodes[0]?.id;
+          if (headNewId) {
+            setSelectedId(headNewId);
+            setTracePath(shortestPathToTarget(combinedNodes, combinedEdges, headNewId));
+          }
+        } else {
+          setNodes(graphUpdate.updatedExistingNodes);
+        }
+
+        announce(graphUpdate.summaryMessage);
       } else {
         announce(`Agent returned: ${res.error || "No response"}`);
       }

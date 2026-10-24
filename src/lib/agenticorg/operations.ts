@@ -62,7 +62,11 @@ export async function runProcessorAgent(
     "ap_processor";
 
   const result = await client.agents.run(agent, {
-    inputs: { invoice_id: invoiceId },
+    inputs: {
+      task: `Process invoice ${invoiceId}`,
+      prompt: `Process invoice ${invoiceId}`,
+      invoice_id: invoiceId,
+    },
   });
 
   return {
@@ -90,6 +94,8 @@ export async function runCommerceDiscovery(
   const commerce = await client.agents.run(agent, {
     action: "buyer_discovery_preview",
     inputs: {
+      task: query,
+      prompt: query,
       merchant_id: merchantId,
       query,
     },

@@ -198,8 +198,11 @@ export async function generateGroundedScaffold(params: {
       "20a9ea93-6f7a-4296-b09b-de829814b4e3";
 
     // Run the epistemic scaffolding agent
+    const promptText = `Generate grounded epistemic analogy mapping ${params.targetLabel} onto ${params.anchorLabel}.`;
     const result = await client.agents.run(agentIdOrType, {
       inputs: {
+        task: promptText,
+        prompt: promptText,
         target_concept: params.targetLabel,
         anchor_concept: params.anchorLabel,
         corpus_snippet: params.userCorpusSnippet ?? "Mastered distributed systems notes",

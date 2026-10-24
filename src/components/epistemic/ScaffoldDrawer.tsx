@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment, type ReactNode } from "react";
 import type { ConceptNode, GraphEdge, ScaffoldMode } from "@/domain/types";
 import { familiarityLabel, relationMeta } from "@/lib/graph";
 import {
@@ -121,8 +122,8 @@ export function ScaffoldDrawer({
 
               <div className="mt-3.5">
                 <p className="font-mono text-[10px] text-faint">Response:</p>
-                <div className="mt-1.5 rounded-xl border border-line bg-panel-2/90 p-3 text-[13px] leading-relaxed text-ink whitespace-pre-wrap font-sans">
-                  {agentOutput.rawText}
+                <div className="mt-1.5 rounded-xl border border-line bg-panel-2/95 p-4 text-[13px] leading-relaxed text-ink shadow-inner">
+                  <RichText content={agentOutput.rawText} />
                 </div>
               </div>
 
@@ -517,3 +518,113 @@ function EpistemicBridge({
     </div>
   );
 }
+
+function parseInline(text: string): ReactNode[] {
+  // Regex splitting by bold (**...**) and inline code (`...`)
+  const tokens = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return tokens.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={i} className="font-semibold text-ink">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code
+          key={i}
+          className="rounded bg-panel px-1.5 py-0.5 font-mono text-[11px] text-cyan-300 border border-line"
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+}
+
+export function RichText({ content }: { content: string }) {
+  if (!content) return null;
+
+  // Split into paragraphs/blocks by double newlines
+  const paragraphs = content.split(/\n\n+/);
+
+  return (
+    <div className="space-y-3 font-sans text-[13px] leading-relaxed text-ink/90">
+      {paragraphs.map((para, pIdx) => {
+        const trimmed = para.trim();
+        if (!trimmed) return null;
+
+        // Code block
+        if (trimmed.startsWith("```") && trimmed.endsWith("```")) {
+          const code = trimmed.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "");
+          return (
+            <pre
+              key={pIdx}
+              className="my-2.5 overflow-x-auto rounded-xl border border-line bg-canvas p-3 font-mono text-xs text-cyan-200"
+            >
+              {code}
+            </pre>
+          );
+        }
+
+        // Headings
+        if (trimmed.startsWith("### ")) {
+          return (
+            <h4 key={pIdx} className="mt-3 mb-1 text-sm font-semibold text-ink">
+              {parseInline(trimmed.slice(4))}
+            </h4>
+          );
+        }
+        if (trimmed.startsWith("## ")) {
+          return (
+            <h3 key={pIdx} className="mt-4 mb-1.5 text-base font-bold text-ink">
+              {parseInline(trimmed.slice(3))}
+            </h3>
+          );
+        }
+
+        const lines = trimmed.split("\n");
+        const isBulletList = lines.every((line) => line.trim().startsWith("- ") || line.trim().startsWith("* "));
+        const isNumberedList = lines.every((line) => /^\d+\.\s/.test(line.trim()));
+
+        if (isBulletList) {
+          return (
+            <ul key={pIdx} className="my-2 space-y-1.5 pl-4 list-disc marker:text-cyan-400">
+              {lines.map((line, lIdx) => (
+                <li key={lIdx} className="text-[13px] leading-relaxed text-ink/90">
+                  {parseInline(line.trim().replace(/^[-*]\s+/, ""))}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (isNumberedList) {
+          return (
+            <ol key={pIdx} className="my-2 space-y-1.5 pl-4 list-decimal marker:text-cyan-400">
+              {lines.map((line, lIdx) => (
+                <li key={lIdx} className="text-[13px] leading-relaxed text-ink/90">
+                  {parseInline(line.trim().replace(/^\d+\.\s+/, ""))}
+                </li>
+              ))}
+            </ol>
+          );
+        }
+
+        return (
+          <p key={pIdx} className="leading-relaxed">
+            {lines.map((line, lIdx) => (
+              <Fragment key={lIdx}>
+                {parseInline(line)}
+                {lIdx < lines.length - 1 && <br />}
+              </Fragment>
+            ))}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
