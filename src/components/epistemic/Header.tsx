@@ -66,6 +66,11 @@ export function Header({
       </div>
 
       <div className="flex shrink-0 items-center gap-2.5 md:gap-4">
+        <div className="hidden items-center gap-1.5 rounded-full border border-line bg-panel-2 px-2.5 py-1 font-mono text-[10px] text-dim md:flex">
+          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+          <span>agenticorg runtime</span>
+        </div>
+
         <div className="flex items-center gap-2 rounded-full border border-line bg-panel-2 py-1.5 pr-3.5 pl-2.5">
           <span className="relative grid place-items-center">
             <span

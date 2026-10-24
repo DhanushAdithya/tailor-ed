@@ -158,8 +158,8 @@ export function InteractionBar({
 
       <p className="mx-auto mt-2 max-w-2xl font-mono text-[9px] leading-relaxed text-faint">
         {mode === "chat"
-          ? "bridge commands route through the prerequisite interceptor before opening the scaffold drawer."
-          : "submitting notes parses concepts and wires new nodes into the graph."}
+          ? "chat commands route through the AgenticOrg epistemic scaffolder & agent runtime."
+          : "submitting notes parses concepts and SOP procedures into the mental model graph."}
       </p>
     </div>
   );

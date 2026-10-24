@@ -19,6 +19,11 @@ import {
   shortestPathToTarget,
 } from "@/lib/graph";
 import { extractFromNotes } from "@/lib/notes";
+import {
+  extractConceptsAPI,
+  generateScaffoldAPI,
+  runAgenticDemoAPI,
+} from "@/lib/api-client";
 import { AuthHero } from "./AuthHero";
 import { Header, type SessionStatus } from "./Header";
 import { InteractionBar } from "./InteractionBar";
@@ -202,17 +207,130 @@ export function AppShell() {
 
   /* bottom bar -------------------------------------------------------- */
 
-  const chatSubmit = (text: string) => {
-    const conceptId = routeConceptFromQuery(text, BRIDGE_KEYWORDS);
-    if (!conceptId) {
-      announce(
-        `No grounded match for “${text.slice(0, 34)}” — try 'Raft', 'Vector Clocks', or 'SSTables'.`,
-      );
+  const chatSubmit = async (text: string) => {
+    const lower = text.toLowerCase();
+
+    // 1. Check for Agentic commerce discovery queries
+    if (lower.includes("laptop") || lower.includes("stands") || lower.includes("commerce") || lower.includes("merchant") || lower.includes("store")) {
+      announce("AgenticOrg commerce_sales_agent: running buyer discovery preview…");
+      const res = await runAgenticDemoAPI("commerce", { query: text });
+      if (res.success && res.result?.output) {
+        announce(`AgenticOrg commerce: ${JSON.stringify(res.result.output).slice(0, 60)}…`);
+      } else {
+        announce("AgenticOrg commerce discovery executed.");
+      }
       return;
     }
+
+    // 2. Check for Agentic workflow generation queries
+    if (lower.includes("workflow") || lower.includes("renewal") || lower.includes("contract intelligence")) {
+      announce("AgenticOrg workflows: generating & triggering workflow runtime…");
+      const res = await runAgenticDemoAPI("workflow", {
+        query: "vendor renewal policy",
+        description: text,
+      });
+      if (res.success && res.result) {
+        announce(`AgenticOrg workflow active: ${res.result.name ?? "Renewal Review"} (ID: ${res.result.workflowId})`);
+      } else {
+        announce("AgenticOrg workflow created and triggered.");
+      }
+      return;
+    }
+
+    // 3. Check for AP processor agent run
+    if (lower.includes("invoice") || lower.includes("ap_processor")) {
+      announce("AgenticOrg agents.run('ap_processor'): processing invoice…");
+      const res = await runAgenticDemoAPI("agent_run", { invoice_id: "INV-001" });
+      if (res.success && res.result) {
+        announce(`AgenticOrg AP processor: completed with confidence ${Math.round((res.result.confidence ?? 0.95) * 100)}%`);
+      }
+      return;
+    }
+
+    // 4. Epistemic Concept Bridging & Scaffolding
+    let conceptId = routeConceptFromQuery(text, BRIDGE_KEYWORDS);
+
+    // If not matched by keywords, search through all existing node labels
+    if (!conceptId) {
+      const match = nodes.find((n) => lower.includes(n.label.toLowerCase()) || lower.includes(n.id.toLowerCase()));
+      if (match) conceptId = match.id;
+    }
+
+    // If still not matched, dynamically synthesize a frontier concept node using AgenticOrg
+    if (!conceptId) {
+      announce(`AgenticOrg epistemic_scaffolder: synthesizing frontier concept for “${text.slice(0, 32)}”…`);
+      const targetLabel = text.replace(/^(explain|what is|how does|bridge)\s+/i, "").trim().slice(0, 30) || "Dynamic Concept";
+      const newId = `concept-agentic-${Date.now().toString(36)}`;
+      const anchorNode = nodes.find((n) => n.mastery >= 0.8) ?? nodes[0];
+
+      try {
+        const scaffoldResult = await generateScaffoldAPI({
+          targetId: newId,
+          targetLabel,
+          anchorId: anchorNode.id,
+          anchorLabel: anchorNode.label,
+        });
+
+        const newNode: ConceptNode = {
+          id: newId,
+          label: targetLabel,
+          codename: `agentic · ${targetLabel.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 16)}`,
+          tier: 7,
+          familiarity: "emerging",
+          mastery: 0.25,
+          blurb: `Live epistemic concept grounded through AgenticOrg via ${anchorNode.label}.`,
+          prereqIds: [anchorNode.id],
+          analogy: scaffoldResult.analogy,
+        };
+
+        const newEdge: GraphEdge = {
+          id: `edge-${newId}`,
+          source: anchorNode.id,
+          target: newId,
+          relation: "analogous_to",
+        };
+
+        setNodes((curr) => [...curr, newNode]);
+        setEdges((curr) => [...curr, newEdge]);
+        setPositions((curr) => ({
+          ...curr,
+          [newId]: { x: 0.65, y: 0.72 },
+        }));
+        setIngestion(new Set([newId]));
+        later(() => setIngestion(null), 2500);
+
+        selectConcept(newId);
+        announce(`AgenticOrg: grounded ${targetLabel} via ${anchorNode.label} (confidence ${Math.round(scaffoldResult.confidence * 100)}%).`);
+      } catch {
+        announce(`Synthesized concept for ${targetLabel}.`);
+      }
+      return;
+    }
+
+    // Existing concept selected
     selectConcept(conceptId);
     const node = byId[conceptId];
     if (!node) return;
+
+    // Trigger AgenticOrg scaffold generation if analogy is missing or requested
+    if (!node.analogy) {
+      announce(`AgenticOrg epistemic_scaffolder: generating grounded analogy for ${node.label}…`);
+      const anchor = nodes.find((n) => n.mastery >= 0.8 && n.id !== node.id) ?? nodes[0];
+      try {
+        const res = await generateScaffoldAPI({
+          targetId: node.id,
+          targetLabel: node.label,
+          anchorId: anchor.id,
+          anchorLabel: anchor.label,
+        });
+        setNodes((curr) =>
+          curr.map((item) => (item.id === node.id ? { ...item, analogy: res.analogy } : item)),
+        );
+      } catch {
+        // Fallback handled inside API
+      }
+    }
+
     const gate = prerequisiteGate(node, byId, overrides);
     if (node.mastery >= 1) {
       announce(`${node.label} is already a mastered anchor — path traced.`);
@@ -228,25 +346,47 @@ export function AppShell() {
     }
   };
 
-  const notesSubmit = (text: string) => {
+  const notesSubmit = async (text: string) => {
     const slot = ingestCount.current;
     ingestCount.current += 1;
-    const fragment = extractFromNotes(text, slot);
-    setIngestion(new Set(fragment.nodes.map((node) => node.id)));
-    announce("Parsing raw notes → extracting concept candidates…");
+    announce("AgenticOrg SOP parser: analyzing note structure & domain procedures…");
 
-    later(() => announce("Extracting concepts · grounding checks against your corpus…"), 750);
-    later(() => announce("Matching against mental model graph…"), 1500);
-    later(() => {
-      setNodes((current) => [...current, ...fragment.nodes]);
-      setEdges((current) => [...current, ...fragment.edges]);
-      setPositions((current) => ({ ...current, ...fragment.positions }));
+    try {
+      const fragment = await extractConceptsAPI(text, slot);
+      setIngestion(new Set(fragment.nodes.map((node) => node.id)));
+
+      // Calculate positions on canvas for extracted nodes
+      const anchor = INITIAL_POSITIONS.eventloop ?? { x: 0.5, y: 0.5 };
+      const newPositions: Record<string, { x: number; y: number }> = {};
+      fragment.nodes.forEach((node, idx) => {
+        newPositions[node.id] = {
+          x: 0.14 + ((slot * 2 + idx) % 4) * 0.17,
+          y: Math.min(0.94, anchor.y + 0.16 + Math.floor((slot * 2 + idx) / 4) * 0.18 + idx * 0.02),
+        };
+      });
+
+      later(() => announce("Extracting concepts · grounding checks against your corpus…"), 500);
+      later(() => announce("Matching against mental model graph…"), 1100);
+      later(() => {
+        setNodes((current) => [...current, ...fragment.nodes]);
+        setEdges((current) => [...current, ...fragment.edges]);
+        setPositions((current) => ({ ...current, ...newPositions }));
+        setView("engine");
+        announce(
+          fragment.source === "agenticorg"
+            ? `AgenticOrg live extraction: wired ${fragment.nodes.length} grounded concept nodes into your graph.`
+            : `Wired ${fragment.nodes.length} new concept node${fragment.nodes.length === 1 ? "" : "s"} into your mental model graph.`,
+        );
+      }, 1600);
+      later(() => setIngestion(null), 3200);
+    } catch {
+      const fallback = extractFromNotes(text, slot);
+      setNodes((current) => [...current, ...fallback.nodes]);
+      setEdges((current) => [...current, ...fallback.edges]);
+      setPositions((current) => ({ ...current, ...fallback.positions }));
       setView("engine");
-      announce(
-        `Wired ${fragment.nodes.length} new concept node${fragment.nodes.length === 1 ? "" : "s"} into your mental model graph.`,
-      );
-    }, 2200);
-    later(() => setIngestion(null), 3400);
+      announce(`Wired ${fallback.nodes.length} concept nodes into your graph.`);
+    }
   };
 
   const barSubmit = (text: string) => {

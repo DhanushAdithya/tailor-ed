@@ -74,13 +74,32 @@ pnpm start   # serve the production build
 ## Project structure
 
 ```text
-src/app/                 # App Router entry (thin server wrapper, Epistemic OS shell)
+src/app/                 # App Router entry (thin server wrapper, Epistemic OS shell, API routes)
+src/app/api/agentic/     # AgenticOrg API endpoints: extraction, scaffolding, workflows, demo runner
 src/components/epistemic/# UI: header, roadmap rail, graph canvas, scaffold drawer, command bar
 src/domain/              # domain types + seeded demo corpus (concepts, edges, tracks)
-src/lib/                 # graph algorithms (path tracing, prerequisite gates) + note extraction
+src/lib/agenticorg/      # AgenticOrg SDK client, epistemic adapter, and operation runners
+src/lib/                 # graph algorithms (path tracing, prerequisite gates) + API client
 src/app/globals.css      # Tailwind v4 theme tokens and motion vocabulary
 next.config.ts           # Turbopack + Tailwind configuration
 ```
+
+## AgenticOrg SDK Integration
+
+Tailor Ed integrates with [`agenticorg-sdk`](https://www.npmjs.com/package/agenticorg-sdk) for epistemic agent execution, procedural note parsing (SOPs), knowledge search, and multi-step learning workflows:
+
+```env
+# .env.local
+AGENTICORG_API_KEY=your-api-key
+AGENTICORG_BASE_URL=https://app.agenticorg.ai
+```
+
+Available API endpoints:
+- `POST /api/agentic/demo` — Test runner for agent execution, commerce discovery, agent generation, and workflows.
+- `POST /api/agentic/extract` — SOP note parsing and knowledge-grounded concept extraction.
+- `POST /api/agentic/scaffold` — Grounded analogy generation bridging mastered anchors to frontier targets.
+- `POST /api/agentic/workflow` — Epistemic curriculum workflow generation and execution.
+- `GET /api/agentic/mcp-a2a` — MCP tools and A2A agent cards for external agent integration.
 
 ## Styling
 
