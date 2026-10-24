@@ -5,6 +5,7 @@ import type { UserProfile } from "@/domain/types";
 import { TRACKS } from "@/domain/data";
 import {
   ChevronDownIcon,
+  GoogleIcon,
   LayersIcon,
   LogoMark,
   NoteIcon,
@@ -175,9 +176,19 @@ function ProfileMenu({
         type="button"
         aria-label="Open profile menu"
         onClick={() => setOpen((value) => !value)}
-        className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white ring-1 ring-white/20 transition-transform hover:scale-105"
+        className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white ring-1 ring-white/20 transition-transform hover:scale-105"
       >
-        {user.initials}
+        {user.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.avatarUrl}
+            alt={user.name}
+            referrerPolicy="no-referrer"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          user.initials
+        )}
       </button>
 
       {open && (
@@ -191,8 +202,18 @@ function ProfileMenu({
           />
           <div className="absolute top-[calc(100%+10px)] right-0 z-40 w-64 rounded-xl border border-line bg-panel p-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)]">
             <div className="flex items-center gap-3 border-b border-line px-2 pb-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white">
-                {user.initials}
+              <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-500/80 to-indigo-500/80 text-xs font-semibold text-white">
+                {user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  user.initials
+                )}
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-xs font-medium text-ink">
@@ -204,6 +225,11 @@ function ProfileMenu({
               </span>
             </div>
             <div className="mt-1.5 space-y-0.5 text-xs text-dim">
+              <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel-2">
+                <GoogleIcon className="h-4 w-4" />
+                <span>Auth Provider</span>
+                <span className="ml-auto font-mono text-[9px] text-cyan-300">Google OAuth</span>
+              </div>
               <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel-2">
                 <LayersIcon className="h-4 w-4 text-faint" />
                 <span>Synced sources</span>

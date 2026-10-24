@@ -9,7 +9,6 @@ import {
   INITIAL_POSITIONS,
   ROADMAP_STEPS,
   TRACKS,
-  USER_PROFILE,
 } from "@/domain/data";
 import {
   deriveStepStatus,
@@ -51,10 +50,46 @@ export function AppShell() {
   const [situation, setSituation] = useState<string | null>(null);
   const [ingestion, setIngestion] = useState<Set<string> | null>(null);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("Connected");
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isPlaceholderConfig, setIsPlaceholderConfig] = useState(true);
 
   const byId = useMemo(() => indexNodes(nodes), [nodes]);
   const ingestCount = useRef(0);
   const timers = useRef<number[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (typeof window !== "undefined") {
+      const search = window.location.search;
+      if (search) {
+        const params = new URLSearchParams(search);
+        if (params.has("code") || (params.has("error") && params.has("state"))) {
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.assign(`/api/auth/google/callback${search}`);
+          return;
+        }
+      }
+    }
+
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data: { user: UserProfile | null; isPlaceholderConfig: boolean }) => {
+        if (!isMounted) return;
+        setIsPlaceholderConfig(data.isPlaceholderConfig);
+        if (data.user) {
+          setUser(data.user);
+        }
+      })
+      .catch((err) => {
+        console.error("Session check failed:", err);
+      })
+      .finally(() => {
+        if (isMounted) setIsCheckingSession(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -152,7 +187,12 @@ export function AppShell() {
     if (track) announce(`Active track → ${track.name} · roadmap locked in.`);
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
     setUser(null);
     setView("overview");
     setSelectedId(null);
@@ -161,6 +201,32 @@ export function AppShell() {
     setIngestion(null);
     setSituation(null);
     setBarMode("chat");
+  };
+
+  const handleGoogleSignIn = () => {
+    // Navigate via browser to trigger server-side OAuth redirect flow
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`${window.location.origin}/api/auth/google`);
+  };
+
+  const handlePlaceholderSignIn = async () => {
+    try {
+      const res = await fetch("/api/auth/placeholder-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Google Account (Placeholder)",
+          email: "explorer.demo@gmail.com",
+        }),
+      });
+      const data = await res.json();
+      if (data.user) {
+        setUser(data.user);
+        announce("Google session connected (Placeholder) — epistemic graph bootstrapped.");
+      }
+    } catch (err) {
+      console.error("Placeholder sign in error:", err);
+    }
   };
 
   /* quick actions ---------------------------------------------------- */
@@ -256,19 +322,28 @@ export function AppShell() {
 
   /* ------------------------------------------------------------------ */
 
+  if (isCheckingSession) {
+    return (
+      <div className="flex h-dvh flex-col bg-canvas">
+        <TitleBoard />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center gap-3">
+            <span className="h-2 w-2 rounded-full bg-cyan-400 soft-pulse" />
+            <span className="font-mono text-xs text-dim">Syncing epistemic session…</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex h-dvh flex-col bg-canvas">
         <TitleBoard />
         <AuthHero
-          onDemoSignIn={() => {
-            setUser(USER_PROFILE);
-            announce("Workspace synced — 3 sources · 1 active track.");
-          }}
-          onGoogleSignIn={() => {
-            setUser(USER_PROFILE);
-            announce("Google workspaces linked — epistemic graph bootstrapped.");
-          }}
+          isPlaceholderConfig={isPlaceholderConfig}
+          onGoogleSignIn={handleGoogleSignIn}
+          onPlaceholderSignIn={handlePlaceholderSignIn}
         />
       </div>
     );
